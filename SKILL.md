@@ -1,6 +1,6 @@
 ---
 name: wechat-download
-description: Download WeChat official account (公众号) articles via wechat-download-api.
+description: Use when the user asks to download, archive, crawl, scrape, or export articles from a WeChat official account (公众号). Handles search, list, batch download with resume, and RSS feed generation via a local wechat-download-api service.
 version: 1.0.0
 ---
 
@@ -40,9 +40,11 @@ pip3 install -r requirements.txt
 ### 2. 启动服务
 
 ```bash
-bash start_wechat_api.sh [port]
+bash scripts/start_wechat_api.sh [port]
 # 默认端口 8765
 ```
+
+> **端口说明**：本 skill 默认使用 `8765` 而非 upstream 的 `5000`，因为 macOS 上 `5000` 常被系统服务占用。如果你用 upstream 的 `start.sh` 启动了服务（端口 `5000`），请在命令前加 `WECHAT_API_URL=http://localhost:5000`。
 
 脚本会自动：
 - 查找 wechat-download-api 仓库位置（通过 `WECHAT_API_REPO` 环境变量或当前目录）
@@ -67,7 +69,7 @@ bash start_wechat_api.sh [port]
 ### 第一步：检查服务状态
 
 ```bash
-python3 download_wechat.py status
+python3 scripts/download_wechat.py status
 ```
 
 ### 第二步：检查登录
@@ -81,7 +83,7 @@ curl -s http://localhost:8765/api/admin/status
 ### 第三步：搜索公众号
 
 ```bash
-python3 download_wechat.py search "公众号名称"
+python3 scripts/download_wechat.py search "公众号名称"
 ```
 
 从输出中获取 `fakeid`。
@@ -89,7 +91,7 @@ python3 download_wechat.py search "公众号名称"
 ### 第四步：下载文章
 
 ```bash
-python3 download_wechat.py download "fakeid" 200 ./output_dir
+python3 scripts/download_wechat.py download "fakeid" 200 ./output_dir
 ```
 
 功能：
@@ -102,8 +104,8 @@ python3 download_wechat.py download "fakeid" 200 ./output_dir
 ### 其他命令
 
 ```bash
-python3 download_wechat.py list "fakeid" 0 50     # 查看文章列表
-python3 download_wechat.py rss "fakeid"            # 获取 RSS 地址
+python3 scripts/download_wechat.py list "fakeid" 0 50     # 查看文章列表
+python3 scripts/download_wechat.py rss "fakeid"            # 获取 RSS 地址
 ```
 
 ---

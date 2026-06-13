@@ -39,9 +39,11 @@ Prerequisites: Python 3.8+, pip, a C compiler (for `curl_cffi`).
 ### 2. Start the API
 
 ```bash
-bash start_wechat_api.sh
+bash scripts/start_wechat_api.sh
 # → http://localhost:8765
 ```
+
+> **Port note**: this skill defaults to `8765` instead of upstream's `5000` (macOS often reserves 5000). If you started the API with upstream's `start.sh` on port `5000`, prefix commands with `WECHAT_API_URL=http://localhost:5000`.
 
 ### 3. Install this skill in Claude Code
 
@@ -64,21 +66,21 @@ In Claude Code, just say:
 Or use the CLI directly:
 
 ```bash
-python3 download_wechat.py search "account name"
+python3 scripts/download_wechat.py search "account name"
 # → fakeid: <base64-encoded-id>
 
-python3 download_wechat.py download "<fakeid>" 200 ./output
+python3 scripts/download_wechat.py download "<fakeid>" 200 ./output
 # → articles downloaded to ./output
 ```
 
 ## Commands
 
 ```bash
-python3 download_wechat.py status                    # health check
-python3 download_wechat.py search "name"             # find account
-python3 download_wechat.py list <fakeid> [begin] [n] # list articles
-python3 download_wechat.py download <fakeid> [n] [dir]  # download all
-python3 download_wechat.py rss <fakeid>              # RSS URL
+python3 scripts/download_wechat.py status                    # health check
+python3 scripts/download_wechat.py search "name"             # find account
+python3 scripts/download_wechat.py list <fakeid> [begin] [n] # list articles
+python3 scripts/download_wechat.py download <fakeid> [n] [dir]  # download all
+python3 scripts/download_wechat.py rss <fakeid>              # RSS URL
 ```
 
 ## Files
@@ -99,7 +101,7 @@ wechat-download/
 
 | Symptom | Fix |
 |---------|-----|
-| `address already in use` | `bash start_wechat_api.sh 9876` |
+| `address already in use` | `bash scripts/start_wechat_api.sh 9876` |
 | All downloads fail with "no URL" | Field is `link`, not `url` |
 | Rate limited | Script auto-retries; increase `MIN_DELAY` if persistent |
 | WeChat security verification | Open the article URL in browser, verify, wait 30 min |

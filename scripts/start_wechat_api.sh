@@ -43,9 +43,16 @@ cd "$REPO"
 
 # ---- already running? ----
 if command -v lsof >/dev/null 2>&1 && lsof -ti:"$PORT" >/dev/null 2>&1; then
-    echo "Already running on port $PORT"
-    echo "Dashboard: http://localhost:$PORT"
-    exit 0
+    # Port is occupied — verify it's actually wechat-download-api
+    if curl -s "http://localhost:$PORT/api/health" 2>/dev/null | grep -q '"status":"healthy"'; then
+        echo "Already running on port $PORT (wechat-download-api confirmed)"
+        echo "Dashboard: http://localhost:$PORT"
+        exit 0
+    else
+        echo "ERROR: Port $PORT is in use by another process, not wechat-download-api."
+        echo "Use a different port: bash start_wechat_api.sh 9876"
+        exit 1
+    fi
 fi
 
 # ---- ensure .env ----

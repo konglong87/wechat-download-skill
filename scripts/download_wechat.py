@@ -128,8 +128,10 @@ def download_all(fakeid, count=200, output_dir=None):
             failures.append((title, "no link field"))
             continue
 
-        # Resume: skip if already downloaded and file is non-empty
-        fname = _sanitize(title)
+        # Use aid as primary key to avoid collisions from duplicate/short titles
+        aid = a.get("aid", "").replace("_", "-") or str(i)
+        slug = _sanitize(title)
+        fname = f"{aid}_{slug}"[:120]
         fpath = os.path.join(out, f"{fname}.txt")
         if os.path.exists(fpath) and os.path.getsize(fpath) > 100:
             skipped += 1
