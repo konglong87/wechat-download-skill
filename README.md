@@ -59,16 +59,16 @@ service account works).  Credentials last ~4 days.
 
 In Claude Code, just say:
 
-> Download articles from 何加盐
+> Download articles from <account name>
 
 Or use the CLI directly:
 
 ```bash
-python3 download_wechat.py search "何加盐"
-# → fakeid: Mzg4MDE1NjQzOA==
+python3 download_wechat.py search "account name"
+# → fakeid: <base64-encoded-id>
 
-python3 download_wechat.py download "Mzg4MDE1NjQzOA==" 200 ./output
-# → 190 articles downloaded, 5.5 MB
+python3 download_wechat.py download "<fakeid>" 200 ./output
+# → articles downloaded to ./output
 ```
 
 ## Commands
