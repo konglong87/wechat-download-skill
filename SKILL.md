@@ -1,7 +1,7 @@
 ---
 name: wechat-download
 description: Use when the user asks to download, archive, crawl, scrape, or export articles from a WeChat official account (公众号).
-version: 1.0.0
+version: 1.0.1
 ---
 
 # 微信公众号文章下载
