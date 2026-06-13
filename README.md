@@ -25,31 +25,40 @@ Features built into the download script:
 
 ## Quick start
 
-### 1. Deploy wechat-download-api
+### 1. Install this skill
 
 ```bash
-git clone https://github.com/tmwgsicp/wechat-download-api.git
-cd wechat-download-api
+git clone git@github.com:konglong87/wechat-download-skill.git ~/.claude/skills/wechat-download
+```
+
+### 2. Deploy wechat-download-api
+
+```bash
+git clone https://github.com/tmwgsicp/wechat-download-api.git /path/to/wechat-download-api
+cd /path/to/wechat-download-api
 cp env.example .env
 pip3 install -r requirements.txt
 ```
 
 Prerequisites: Python 3.8+, pip, a C compiler (for `curl_cffi`).
 
-### 2. Start the API
+### 3. Start the API
 
 ```bash
-bash scripts/start_wechat_api.sh
+WECHAT_API_REPO=/path/to/wechat-download-api bash ~/.claude/skills/wechat-download/scripts/start_wechat_api.sh
 # → http://localhost:8765
 ```
 
-> **Port note**: this skill defaults to `8765` instead of upstream's `5000` (macOS often reserves 5000). If you started the API with upstream's `start.sh` on port `5000`, prefix commands with `WECHAT_API_URL=http://localhost:5000`.
-
-### 3. Install this skill in Claude Code
+Or, if you placed the API repo next to the skill:
 
 ```bash
-ln -s "$(pwd)" ~/.claude/skills/wechat-download
+cd ~/.claude/skills/wechat-download
+bash scripts/start_wechat_api.sh
 ```
+
+The script auto-discovers the API repo at `./wechat-download-api` or `../wechat-download-api`.
+
+> **Port note**: this skill defaults to `8765` instead of upstream's `5000` (macOS often reserves 5000). If you prefer upstream's port, launch with `bash scripts/start_wechat_api.sh 5000`. Or, if you already started the API via upstream's `start.sh` on `5000`, prefix CLI commands with `WECHAT_API_URL=http://localhost:5000`.
 
 ### 4. Scan QR code to log in
 

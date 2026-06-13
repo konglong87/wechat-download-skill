@@ -39,10 +39,15 @@ pip3 install -r requirements.txt
 
 ### 2. 启动服务
 
+从 skill 目录运行：
+
 ```bash
-bash scripts/start_wechat_api.sh [port]
-# 默认端口 8765
+cd ~/.claude/skills/wechat-download
+WECHAT_API_REPO=/path/to/wechat-download-api bash scripts/start_wechat_api.sh
+# 默认端口 8765，可指定: bash scripts/start_wechat_api.sh 9876
 ```
+
+脚本会自动发现 `../wechat-download-api`（如果放在同级目录）或通过 `WECHAT_API_REPO` 环境变量定位。
 
 > **端口说明**：本 skill 默认使用 `8765` 而非 upstream 的 `5000`，因为 macOS 上 `5000` 常被系统服务占用。如果你用 upstream 的 `start.sh` 启动了服务（端口 `5000`），请在命令前加 `WECHAT_API_URL=http://localhost:5000`。
 
@@ -118,7 +123,7 @@ python3 scripts/download_wechat.py rss "fakeid"            # 获取 RSS 地址
 ERROR: [Errno 48] address already in use
 ```
 
-**解决**：换一个端口：`bash start_wechat_api.sh 9876`
+**解决**：换一个端口：`bash scripts/start_wechat_api.sh 9876`
 
 ### 错误 2：文章 URL 字段名（关键）
 
