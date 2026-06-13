@@ -24,40 +24,31 @@ version: 1.0.1
 - **wechat-download-api**：第三方开源服务，使用 Chrome TLS 指纹（curl_cffi）模拟浏览器，通过微信公众平台后台凭证调用接口
 - **本 skill 脚本**：封装了 API 的搜索、列表、下载功能，带限频自适应和断点续传
 
-## 前置条件
+## 使用方式
 
-### 1. 部署 wechat-download-api
+用户安装本 skill 后，只需要在 agent 里说「下载 XXX 的公众号文章」。除扫码登录外，不要要求用户手动部署底层服务；agent 应优先自动运行本目录脚本完成环境准备。
 
-```bash
-git clone https://github.com/tmwgsicp/wechat-download-api.git
-cd wechat-download-api
-cp env.example .env
-pip3 install -r requirements.txt
-```
-
-核心依赖：`fastapi`、`uvicorn`、`curl_cffi>=0.7.0`、`httpx`、`pydantic`、`python-dotenv`、`beautifulsoup4`
-
-### 2. 启动服务
+### 1. 启动服务
 
 从 skill 目录运行：
 
 ```bash
 cd ~/.claude/skills/wechat-download
-WECHAT_API_REPO=/path/to/wechat-download-api bash scripts/start_wechat_api.sh
+bash scripts/start_wechat_api.sh
 # 默认端口 8765，可指定: bash scripts/start_wechat_api.sh 9876
 ```
 
-脚本会自动发现 `../wechat-download-api`（如果放在同级目录）或通过 `WECHAT_API_REPO` 环境变量定位。
+脚本会自动发现 `./wechat-download-api`、`../wechat-download-api`，也支持通过 `WECHAT_API_REPO` 环境变量定位。找不到时会自动 clone `wechat-download-api` 到当前 skill 目录，并安装底层服务依赖。
 
 > **端口说明**：本 skill 默认使用 `8765` 而非 upstream 的 `5000`，因为 macOS 上 `5000` 常被系统服务占用。如果你用 upstream 的 `start.sh` 启动了服务（端口 `5000`），请在命令前加 `WECHAT_API_URL=http://localhost:5000`。
 
 脚本会自动：
-- 查找 wechat-download-api 仓库位置（通过 `WECHAT_API_REPO` 环境变量或当前目录）
+- 查找或下载 wechat-download-api 仓库
 - 创建 `.env`（如果不存在）
 - 安装缺失的 Python 依赖
 - 后台启动服务
 
-### 3. 扫码登录
+### 2. 扫码登录
 
 **前提：用户需要有一个微信公众号（订阅号/服务号均可）。**
 
@@ -71,7 +62,15 @@ WECHAT_API_REPO=/path/to/wechat-download-api bash scripts/start_wechat_api.sh
 
 ## 操作流程
 
-### 第一步：检查服务状态
+### 第一步：检查/启动服务
+
+如果服务还没启动，先运行：
+
+```bash
+bash scripts/start_wechat_api.sh
+```
+
+然后检查服务状态：
 
 ```bash
 python3 scripts/download_wechat.py status

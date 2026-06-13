@@ -5,6 +5,7 @@
 #   1. $WECHAT_API_REPO  (env var, if set)
 #   2. ./wechat-download-api  (relative to CWD)
 #   3. ../wechat-download-api  (sibling directory)
+# If not found, it clones the repo into ./wechat-download-api.
 #
 # Usage: bash start_wechat_api.sh [port]
 set -euo pipefail
@@ -28,14 +29,15 @@ find_repo() {
 
 REPO=$(find_repo)
 if [ -z "$REPO" ]; then
-    echo "ERROR: Cannot find wechat-download-api checkout."
-    echo ""
-    echo "Clone it first:"
-    echo "  git clone https://github.com/tmwgsicp/wechat-download-api.git"
-    echo ""
-    echo "Or set the WECHAT_API_REPO environment variable:"
-    echo "  export WECHAT_API_REPO=/path/to/wechat-download-api"
-    exit 1
+    if ! command -v git >/dev/null 2>&1; then
+        echo "ERROR: Cannot find wechat-download-api checkout and git is not installed."
+        echo "Set WECHAT_API_REPO=/path/to/wechat-download-api after cloning it manually."
+        exit 1
+    fi
+
+    echo "wechat-download-api not found. Cloning into ./wechat-download-api ..."
+    git clone https://github.com/tmwgsicp/wechat-download-api.git ./wechat-download-api
+    REPO="$(cd ./wechat-download-api && pwd)"
 fi
 
 echo "Using wechat-download-api at: $REPO"
@@ -50,7 +52,7 @@ if command -v lsof >/dev/null 2>&1 && lsof -ti:"$PORT" >/dev/null 2>&1; then
         exit 0
     else
         echo "ERROR: Port $PORT is in use by another process, not wechat-download-api."
-        echo "Use a different port: bash start_wechat_api.sh 9876"
+        echo "Use a different port: bash scripts/start_wechat_api.sh 9876"
         exit 1
     fi
 fi
