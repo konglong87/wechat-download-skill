@@ -10,28 +10,44 @@ Usage:
   python3 download_wechat.py rss <fakeid>              # Print RSS feed URL
 """
 
-import requests
 import json
 import os
-import sys
 import re
+import sys
 import time
+import urllib.request
+import urllib.error
+import urllib.parse
 
 API = os.environ.get("WECHAT_API_URL", "http://localhost:8765")
 DEFAULT_OUTPUT = os.path.join(os.getcwd(), "wechat_downloads")
 MIN_DELAY = 3.2  # seconds between article requests (API rate limit)
 
 
+# --------------- tiny http client (stdlib only) ---------------
+
+def _get(path, params=None):
+    url = f"{API}{path}"
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read())
+
+
+def _post(path, body):
+    url = f"{API}{path}"
+    data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read())
+
+
 # --------------- helpers ---------------
-
-def _check_health():
-    try:
-        resp = requests.get(f"{API}/api/health", timeout=5)
-        data = resp.json()
-        return data.get("status") == "healthy"
-    except Exception:
-        return False
-
 
 def _sanitize(title):
     """Turn an article title into a safe filename."""
@@ -44,8 +60,7 @@ def _sanitize(title):
 
 def search_biz(query):
     """Search for official accounts by name."""
-    resp = requests.get(f"{API}/api/public/searchbiz", params={"query": query})
-    data = resp.json()
+    data = _get("/api/public/searchbiz", {"query": query})
     if not data.get("success"):
         print(f"Search failed: {data.get('error', 'unknown error')}")
         return []
@@ -61,8 +76,7 @@ def list_articles(fakeid, begin=0, count=50, keyword=None):
     params = {"fakeid": fakeid, "begin": begin, "count": count}
     if keyword:
         params["keyword"] = keyword
-    resp = requests.get(f"{API}/api/public/articles", params=params)
-    data = resp.json()
+    data = _get("/api/public/articles", params)
     if not data.get("success"):
         print(f"Failed: {data.get('error', 'unknown error')}")
         return []
@@ -76,8 +90,7 @@ def list_articles(fakeid, begin=0, count=50, keyword=None):
 
 def _fetch_article(url):
     """Fetch a single article. Returns (content, error_msg)."""
-    resp = requests.post(f"{API}/api/article", json={"url": url}, timeout=60)
-    item = resp.json()
+    item = _post("/api/article", {"url": url})
     if not item.get("success"):
         return None, item.get("error", "unknown")
     d = item["data"]
@@ -97,9 +110,9 @@ def download_all(fakeid, count=200, output_dir=None):
     all_articles = []
     begin = 0
     while begin < count:
-        params = {"fakeid": fakeid, "begin": begin, "count": min(50, count - begin)}
-        resp = requests.get(f"{API}/api/public/articles", params=params)
-        data = resp.json()
+        batch_size = min(50, count - begin)
+        params = {"fakeid": fakeid, "begin": begin, "count": batch_size}
+        data = _get("/api/public/articles", params)
         if not data.get("success"):
             print(f"  Error: {data.get('error')}")
             break
@@ -187,7 +200,6 @@ def download_all(fakeid, count=200, output_dir=None):
     print(f"\n{'='*60}")
     print(f"Done.  Success: {success}  Skipped: {skipped}  Failed: {len(failures)}")
     if failures:
-        # save failures for later inspection
         fail_path = os.path.join(out, "failures.json")
         with open(fail_path, "w", encoding="utf-8") as f:
             json.dump(failures, f, ensure_ascii=False, indent=2)
@@ -210,7 +222,7 @@ def main():
     cmd = sys.argv[1]
 
     if cmd == "status":
-        data = requests.get(f"{API}/api/health", timeout=5).json()
+        data = _get("/api/health")
         print(json.dumps(data, ensure_ascii=False, indent=2))
     elif cmd == "search":
         if len(sys.argv) < 3:

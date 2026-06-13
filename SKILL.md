@@ -1,6 +1,6 @@
 ---
 name: wechat-download
-description: Use when the user asks to download, archive, crawl, scrape, or export articles from a WeChat official account (公众号). Handles search, list, batch download with resume, and RSS feed generation via a local wechat-download-api service.
+description: Use when the user asks to download, archive, crawl, scrape, or export articles from a WeChat official account (公众号).
 version: 1.0.0
 ---
 
