@@ -2,6 +2,8 @@
 
 这是一个 Claude Code skill，用来下载微信公众号文章。
 
+English version: [README.en.md](README.en.md)
+
 ## 最简单的用法
 
 安装好这个 skill 之后，直接在 Claude Code / agent 里说：
@@ -78,6 +80,7 @@ python3 scripts/download_wechat.py rss "fakeid"
 wechat-download/
 ├── SKILL.md
 ├── README.md
+├── README.en.md
 └── scripts/
     ├── download_wechat.py
     ├── start_wechat_api.sh
