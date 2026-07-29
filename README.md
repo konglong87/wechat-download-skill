@@ -97,6 +97,6 @@ wechat-download/
 | 部分文章下载失败 | 文章可能被删除、访问受限、是广告/图片分享，通常跳过即可 |
 | `curl_cffi` 安装失败 | macOS 安装 Xcode CLT：`xcode-select --install` |
 
-## 底层项目
+## 感谢底层项目
 
 本 skill 封装了 [tmwgsicp/wechat-download-api](https://github.com/tmwgsicp/wechat-download-api)。
