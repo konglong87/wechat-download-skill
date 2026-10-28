@@ -6,3 +6,6 @@ __pycache__/
 # Default WeRead output and local runtime dependencies
 wechat_downloads/
 node_modules/
+
+# Never commit browser session secrets
+*.cookie

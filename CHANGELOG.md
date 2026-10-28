@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add an opt-in, separate WeRead Web body adapter using a user-supplied owner-only Cookie file (`web-cookie` hidden prompt); never log or commit credentials, reject redirects, login/challenge shells, and short bodies. Keep exact RSS as the final fallback. Authenticated Web body success is not yet verified.
+- All three 匿名测试公众号 source URLs independently redirected to WeChat verification in the latest real run; a bounded no-redirect HEAD probe now stops futile retries on these redirects. Latest-three save remains **0/3**, and the Web endpoint answered `errCode=-2010` without Web authentication. Unit tests cover the route and refusal paths.
+
 - Retry transient WeRead article-body failures up to three additional times (2/4/8-second backoff, forced refresh); stop immediately on explicit rate limits or verification challenges.
 - On failure, automatically consult the public RSS catalogue for the verified account and save only an exact matching article with nontrivial `content:encoded`; mark third-party provenance. Accept `--rss-account` when the name is unavailable upstream. Do not substitute other feed items.
 - The latest-three live re-test for 匿名测试公众号 still saved 0/3: two exhausted retries, one challenge stopped early, and this account was absent from the RSS catalogue. A live indexed-feed fallback attempt timed out; controlled exact-item fixtures and 34 unit tests pass.

@@ -9,10 +9,14 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urljoin
+import urllib.error
+import urllib.request
 
 CLI_VERSION = "0.1.2"
 MIN_UNVERIFIED_BODY_CHARACTERS = 80
+SOURCE_PROBE_TIMEOUT_SECONDS = 8
+WECHAT_CHALLENGE_PATH = "/mp/wappoc_appmsgcaptcha"
 ACCOUNT_ID = re.compile(r"^MP_WXS_[0-9]+$")
 INSTALL_PREFIX = Path.home() / ".local/share/wechat-download-skill/weread-omni"
 INSTALL_SCRIPT = Path(__file__).with_name("install_weread_cli.sh")
@@ -21,11 +25,15 @@ INSTALL_SCRIPT = Path(__file__).with_name("install_weread_cli.sh")
 class WeReadError(RuntimeError):
     """An authentication, transport, or upstream API failure."""
 
-    def __init__(self, message, *, code=None, account_name=None, status=None):
+    def __init__(self, message, *, code=None, account_name=None, status=None,
+                 review_id=None, article_title=None, published_at=None):
         super().__init__(message)
         self.code = code
         self.account_name = account_name
         self.status = status
+        self.review_id = review_id
+        self.article_title = article_title
+        self.published_at = published_at
 
 
 def executable_path():
@@ -75,6 +83,30 @@ def _find_article_url(obj, depth=0):
     return None
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
+
+
+def source_redirects_to_challenge(url, opener=None):
+    """One bounded HEAD probe; never follow, log, or reuse a captcha token."""
+    if not article_url(url):
+        return False
+    opener = opener or urllib.request.build_opener(_NoRedirect)
+    request = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with opener.open(request, timeout=SOURCE_PROBE_TIMEOUT_SECONDS):
+            return False
+    except urllib.error.HTTPError as exc:
+        if exc.code not in (301, 302, 303, 307, 308):
+            return False
+        location = exc.headers.get("Location", "")
+        parsed = urlsplit(urljoin(url, location))
+        return parsed.scheme == "https" and parsed.hostname == "mp.weixin.qq.com" and parsed.path == WECHAT_CHALLENGE_PATH
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        return False
+
+
 class WeReadClient:
     def __init__(self, executable=None, account=None, refresh=False, runner=None):
         self.executable = executable or executable_path()
@@ -112,7 +144,9 @@ class WeReadClient:
             # Do not log the full upstream article payload or any credentials.
             label = "{} [{}]".format(message, code) if code else message
             raise WeReadError("WeRead CLI failed (exit {}): {}".format(completed.returncode, label[:500]),
-                              code=code, account_name=article.get("accountName"), status=payload.get("status"))
+                              code=code, account_name=article.get("accountName"), status=payload.get("status"),
+                              review_id=article.get("reviewId"), article_title=article.get("title"),
+                              published_at=article.get("publishedAt"))
         try:
             return json.loads(completed.stdout)
         except (ValueError, TypeError) as exc:
@@ -142,6 +176,9 @@ class WeReadClient:
         if isinstance(review_id, str) and review_id:
             return _find_article_url(self.call("review", "single", review_id))
         return None
+
+    def is_source_challenge(self, url):
+        return source_redirects_to_challenge(url)
 
     def read(self, url, refresh=None):
         if not article_url(url):

@@ -22,6 +22,7 @@ import time
 from article_retrieval import read_article
 from rss_fallback import RSSFallback
 from weread_client import WeReadClient, WeReadError, article_url
+from weread_web_body import DEFAULT_COOKIE_FILE, WeReadWebBody, store_cookie
 
 PAGE_SIZE = 20
 MAX_ARTICLES = 1000
@@ -115,7 +116,7 @@ def collect_articles(client, account_id, count, sleep=time.sleep):
 
 
 def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, sleep=time.sleep,
-                     rss_account=None, rss_fallback=None):
+                     rss_account=None, rss_fallback=None, web_client=None):
     output_dir = Path(output_dir)
     fallback = rss_fallback if rss_fallback is not None else RSSFallback()
     success = skipped = processed = 0
@@ -132,7 +133,9 @@ def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, s
                 url = client.resolve_url(entry)
                 if not url:
                     raise WeReadError("WeRead did not provide a valid original article URL")
-                result = read_article(client, url, account_name=rss_account, fallback=fallback, sleep=sleep)
+                result = read_article(client, url, account_name=rss_account, fallback=fallback, sleep=sleep,
+                                      web_client=web_client, review_id=key, title=title,
+                                      published_at=entry.get("createTime"))
                 path, saved = _save_article(output_dir, key, title, url, entry, result)
                 success += int(saved)
                 skipped += int(not saved)
@@ -162,11 +165,12 @@ def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, s
 
 
 def download_url(client, url, output_dir=DEFAULT_OUTPUT, rss_account=None, rss_fallback=None,
-                 sleep=time.sleep):
+                 sleep=time.sleep, web_client=None):
     if not article_url(url):
         raise WeReadError("Expected an https://mp.weixin.qq.com/s article URL")
     output_dir = Path(output_dir)
-    result = read_article(client, url, account_name=rss_account, fallback=rss_fallback, sleep=sleep)
+    result = read_article(client, url, account_name=rss_account, fallback=rss_fallback, sleep=sleep,
+                          web_client=web_client)
     path, saved = _save_article(output_dir, url, result.get("title"), url, {}, result)
     print("{}: {} ({} bytes)".format("Downloaded" if saved else "Already exists", path, path.stat().st_size))
     return 0
@@ -175,9 +179,13 @@ def download_url(client, url, output_dir=DEFAULT_OUTPUT, rss_account=None, rss_f
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--refresh", action="store_true", help="refetch articles instead of using cached content")
+    default_cookie = os.environ.get("WEREAD_WEB_COOKIE_FILE") or (DEFAULT_COOKIE_FILE if DEFAULT_COOKIE_FILE.exists() else None)
+    parser.add_argument("--web-cookie-file", type=Path, default=default_cookie,
+                        help="private owner-only WeRead Web Cookie file; never use a project path")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("login", help="scan a WeRead QR code (separate from MP login)")
     commands.add_parser("status", help="verify WeRead authentication")
+    commands.add_parser("web-cookie", help="privately save a Cookie from your own WeRead Web login")
     search = commands.add_parser("search", help="search public accounts")
     search.add_argument("query")
     listing = commands.add_parser("list", help="list a public account's articles")
@@ -195,7 +203,12 @@ def main(argv=None):
     direct.add_argument("--rss-account", help="exact public-account name if WeRead cannot identify it")
     args = parser.parse_args(argv)
     try:
+        if args.command == "web-cookie":
+            store_cookie(args.web_cookie_file or DEFAULT_COOKIE_FILE)
+            print("WeRead Web Cookie saved privately; it is not a guarantee of article access")
+            return 0
         client = WeReadClient(refresh=args.refresh)
+        web_client = WeReadWebBody(args.web_cookie_file) if args.web_cookie_file else None
         if args.command == "login":
             return subprocess.call(client.command("login"))
         if args.command == "status":
@@ -205,9 +218,11 @@ def main(argv=None):
         elif args.command == "list":
             result = client.articles(args.account_id, args.count, args.begin or None)
         elif args.command == "download":
-            return download_account(client, args.account_id, args.count, args.output_dir, rss_account=args.rss_account)
+            return download_account(client, args.account_id, args.count, args.output_dir,
+                                    rss_account=args.rss_account, web_client=web_client)
         else:
-            return download_url(client, args.article_url, args.output_dir, rss_account=args.rss_account)
+            return download_url(client, args.article_url, args.output_dir,
+                                rss_account=args.rss_account, web_client=web_client)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except WeReadError as exc:

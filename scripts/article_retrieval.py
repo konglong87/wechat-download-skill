@@ -25,11 +25,14 @@ def retryable(error):
     return error.code in TRANSIENT_SOURCE_CODES or any(word in message for word in TRANSIENT_WORDS)
 
 
-def read_article(client, url, account_name=None, fallback=None, sleep=time.sleep):
-    """Try WeRead once plus three bounded retries; never retry a challenge."""
+def read_article(client, url, account_name=None, fallback=None, sleep=time.sleep,
+                 web_client=None, review_id=None, title=None, published_at=None):
+    """Try eInk, optional authenticated Web, then exact public RSS."""
     fallback = fallback if fallback is not None else RSSFallback()
     last_error = None
     attempts = 0
+    web_error = None
+    challenge_probed = False
     for retry in range(MAX_READ_RETRIES + 1):
         attempts += 1
         try:
@@ -37,15 +40,31 @@ def read_article(client, url, account_name=None, fallback=None, sleep=time.sleep
         except WeReadError as exc:
             last_error = exc
             account_name = exc.account_name or account_name
+            review_id = exc.review_id or review_id
+            title = exc.article_title or title
+            published_at = exc.published_at or published_at
             if retry >= MAX_READ_RETRIES or not retryable(exc):
                 break
+            if exc.code == "SOURCE_CONTENT_INSUFFICIENT" and not challenge_probed:
+                challenge_probed = True
+                if getattr(client, "is_source_challenge", lambda _: False)(url):
+                    print("WeChat source redirects to verification; skip futile body retries", file=sys.stderr)
+                    break
             delay = RETRY_BACKOFF_SECONDS[retry]
             print("WeRead body unavailable; retry {}/{} in {}s".format(retry + 1, MAX_READ_RETRIES, delay), file=sys.stderr)
             sleep(delay)
+    if web_client is not None and review_id and not any(
+            word in str(last_error).lower() for word in ("freq control", "rate limit", "-2041")):
+        try:
+            return web_client.read(review_id, title=title, account_name=account_name, published_at=published_at)
+        except WeReadError as exc:
+            web_error = exc
+            print("Authenticated WeRead Web body unavailable: {}".format(exc), file=sys.stderr)
     try:
         result = fallback.fetch(url, account_name)
     except RSSError as exc:
-        raise WeReadError("WeRead failed after {} attempt(s): {}; RSS fallback unavailable: {}".format(
-            attempts, last_error, exc), code=last_error.code) from exc
+        web_detail = "; WeRead Web: {}".format(web_error) if web_error is not None else ""
+        raise WeReadError("WeRead failed after {} attempt(s): {}{}; RSS fallback unavailable: {}".format(
+            attempts, last_error, web_detail, exc), code=last_error.code) from exc
     print("Article matched and recovered from public RSS after {} WeRead attempt(s)".format(attempts), file=sys.stderr)
     return result
