@@ -2,12 +2,15 @@
 
 ## Unreleased
 
+- Re-test three newest 匿名测试公众号 posts individually. Fix an upstream false positive: the Ontology article contains the phrase “需要验证” in its genuine body, but weread-omni scans the entire HTML and rejects it. A strict normal-page body adapter now saves this article (42,669-byte Markdown, 17,671 body characters); the other two expose only 326/447-character previews and remain failures. Actual newest-three outcome: **1/3**.
+- Remove the previous HEAD-based challenge guard: a known article that succeeds with `--refresh` also redirects on independent HEAD. Do not equate HEAD status with the WeRead GET body. Reject actual verification redirects during the bounded page request instead.
+
 - Add an opt-in, separate WeRead Web body adapter using a user-supplied owner-only Cookie file (`web-cookie` hidden prompt); never log or commit credentials, reject redirects, login/challenge shells, and short bodies. Keep exact RSS as the final fallback. Authenticated Web body success is not yet verified.
-- All three 匿名测试公众号 source URLs independently redirected to WeChat verification in the latest real run; a bounded no-redirect HEAD probe now stops futile retries on these redirects. Latest-three save remains **0/3**, and the Web endpoint answered `errCode=-2010` without Web authentication. Unit tests cover the route and refusal paths.
+- A separate WeRead Web session remains optional and unproven for the two still-missing articles: without it, the endpoint answered `errCode=-2010`. Independently issued HEAD/browser-style requests may challenge even when the pinned eInk GET returns a normal article; only the actual body response determines success.
 
 - Retry transient WeRead article-body failures up to three additional times (2/4/8-second backoff, forced refresh); stop immediately on explicit rate limits or verification challenges.
 - On failure, automatically consult the public RSS catalogue for the verified account and save only an exact matching article with nontrivial `content:encoded`; mark third-party provenance. Accept `--rss-account` when the name is unavailable upstream. Do not substitute other feed items.
-- The latest-three live re-test for 匿名测试公众号 still saved 0/3: two exhausted retries, one challenge stopped early, and this account was absent from the RSS catalogue. A live indexed-feed fallback attempt timed out; controlled exact-item fixtures and 34 unit tests pass.
+- Before the public-body parser fix, the three newest 匿名测试公众号 posts saved 0/3. The exact RSS catalogue did not include this account; the provider also timed out intermittently.
 
 ## v1.3.0 — 2026-10-28
 

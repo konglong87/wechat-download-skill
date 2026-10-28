@@ -216,6 +216,19 @@ class WeReadTests(unittest.TestCase):
             self.assertEqual(len(list(Path(d).glob("*.md"))), 1)
             self.assertFalse((Path(d) / "failures.json").exists())
 
+    def test_direct_review_id_file_is_reused_by_batch(self):
+        class Client(FakeClient):
+            def read(self, url):
+                result = super().read(url)
+                result["reviewId"] = "r1"
+                return result
+        entry = {"reviewId": "r1", "mpInfo": {"title": "示例标题", "doc_url": ARTICLE_URL}}
+        client = Client({None: {"articles": [entry]}})
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(download_url(client, ARTICLE_URL, d), 0)
+            self.assertEqual(download_account(client, ACCOUNT, 1, d, sleep=lambda _: None), 0)
+            self.assertEqual(len(list(Path(d).glob("*.md"))), 1)
+
     def test_known_url_download(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(download_url(FakeClient(), ARTICLE_URL, d), 0)

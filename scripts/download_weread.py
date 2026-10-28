@@ -23,6 +23,7 @@ from article_retrieval import read_article
 from rss_fallback import RSSFallback
 from weread_client import WeReadClient, WeReadError, article_url
 from weread_web_body import DEFAULT_COOKIE_FILE, WeReadWebBody, store_cookie
+from wechat_page_body import WeChatPageBody
 
 PAGE_SIZE = 20
 MAX_ARTICLES = 1000
@@ -116,7 +117,7 @@ def collect_articles(client, account_id, count, sleep=time.sleep):
 
 
 def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, sleep=time.sleep,
-                     rss_account=None, rss_fallback=None, web_client=None):
+                     rss_account=None, rss_fallback=None, web_client=None, source_client=None):
     output_dir = Path(output_dir)
     fallback = rss_fallback if rss_fallback is not None else RSSFallback()
     success = skipped = processed = 0
@@ -135,7 +136,8 @@ def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, s
                     raise WeReadError("WeRead did not provide a valid original article URL")
                 result = read_article(client, url, account_name=rss_account, fallback=fallback, sleep=sleep,
                                       web_client=web_client, review_id=key, title=title,
-                                      published_at=entry.get("createTime"))
+                                      published_at=entry.get("createTime"), source_client=source_client,
+                                      preview=(entry.get("mpInfo") or {}).get("content"))
                 path, saved = _save_article(output_dir, key, title, url, entry, result)
                 success += int(saved)
                 skipped += int(not saved)
@@ -165,13 +167,13 @@ def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, s
 
 
 def download_url(client, url, output_dir=DEFAULT_OUTPUT, rss_account=None, rss_fallback=None,
-                 sleep=time.sleep, web_client=None):
+                 sleep=time.sleep, web_client=None, source_client=None):
     if not article_url(url):
         raise WeReadError("Expected an https://mp.weixin.qq.com/s article URL")
     output_dir = Path(output_dir)
     result = read_article(client, url, account_name=rss_account, fallback=rss_fallback, sleep=sleep,
-                          web_client=web_client)
-    path, saved = _save_article(output_dir, url, result.get("title"), url, {}, result)
+                          web_client=web_client, source_client=source_client)
+    path, saved = _save_article(output_dir, result.get("reviewId") or url, result.get("title"), url, {}, result)
     print("{}: {} ({} bytes)".format("Downloaded" if saved else "Already exists", path, path.stat().st_size))
     return 0
 
@@ -209,6 +211,7 @@ def main(argv=None):
             return 0
         client = WeReadClient(refresh=args.refresh)
         web_client = WeReadWebBody(args.web_cookie_file) if args.web_cookie_file else None
+        source_client = WeChatPageBody()
         if args.command == "login":
             return subprocess.call(client.command("login"))
         if args.command == "status":
@@ -219,10 +222,10 @@ def main(argv=None):
             result = client.articles(args.account_id, args.count, args.begin or None)
         elif args.command == "download":
             return download_account(client, args.account_id, args.count, args.output_dir,
-                                    rss_account=args.rss_account, web_client=web_client)
+                                    rss_account=args.rss_account, web_client=web_client, source_client=source_client)
         else:
             return download_url(client, args.article_url, args.output_dir,
-                                rss_account=args.rss_account, web_client=web_client)
+                                rss_account=args.rss_account, web_client=web_client, source_client=source_client)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except WeReadError as exc:

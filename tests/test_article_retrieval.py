@@ -77,25 +77,50 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(result["markdown"], "RSS正文" * 100)
         rss.fetch.assert_called_once_with(URL, "目标号")
 
-    def test_redirected_to_verification_skips_three_futile_retries(self):
-        client, rss = Mock(), Mock()
-        client.read.side_effect = WeReadError("content insufficient", code="SOURCE_CONTENT_INSUFFICIENT",
+    def test_source_body_rescues_upstream_false_block_without_rss(self):
+        client, source, rss = Mock(), Mock(), Mock()
+        client.read.side_effect = WeReadError("article source was blocked", code="SOURCE_CONTENT_INSUFFICIENT",
+                                              review_id="MP_WXS_1234567890_abc", account_name="目标号",
+                                              article_title="真实标题")
+        source.read.return_value = {"markdown": "真实正文" * 200, "contentSource": "微信原文公开页"}
+        result = read_article(client, URL, fallback=rss, source_client=source,
+                              sleep=lambda _: self.fail("explicit blocked: no retry"))
+        self.assertIn("真实正文", result["markdown"])
+        source.read.assert_called_once_with(URL, title="真实标题", account_name="目标号",
+                                            published_at=None, preview=None, review_id="MP_WXS_1234567890_abc")
+        rss.fetch.assert_not_called()
+
+    def test_source_preview_failure_continues_to_exact_rss(self):
+        client, source, rss = Mock(), Mock(), Mock()
+        client.read.side_effect = WeReadError("article source was blocked", code="SOURCE_CONTENT_INSUFFICIENT",
                                               account_name="目标号")
-        client.is_source_challenge.return_value = True
-        rss.fetch.side_effect = RSSError("not indexed")
-        with self.assertRaises(WeReadError):
-            read_article(client, URL, fallback=rss, sleep=lambda _: self.fail("must not retry"))
-        client.read.assert_called_once()
-        client.is_source_challenge.assert_called_once_with(URL)
+        source.read.side_effect = WeReadError("no full body", code="SOURCE_CONTENT_INSUFFICIENT")
+        rss.fetch.return_value = {"markdown": "RSS正文" * 100}
+        result = read_article(client, URL, fallback=rss, source_client=source, sleep=lambda _: None)
+        self.assertIn("RSS正文", result["markdown"])
         rss.fetch.assert_called_once_with(URL, "目标号")
 
+    def test_source_failure_then_web_success_before_rss(self):
+        client, source, web, rss = Mock(), Mock(), Mock(), Mock()
+        client.read.side_effect = WeReadError("article source was blocked", code="SOURCE_CONTENT_INSUFFICIENT",
+                                              review_id="MP_WXS_1234567890_abc", account_name="目标号")
+        source.read.side_effect = WeReadError("only preview", code="SOURCE_CONTENT_INSUFFICIENT")
+        web.read.return_value = {"markdown": "网页登录正文" * 200}
+        result = read_article(client, URL, source_client=source, web_client=web,
+                              fallback=rss, sleep=lambda _: None)
+        self.assertIn("网页登录正文", result["markdown"])
+        source.read.assert_called_once()
+        web.read.assert_called_once()
+        rss.fetch.assert_not_called()
+
     def test_rate_limit_does_not_switch_to_web(self):
-        client, web, rss = Mock(), Mock(), Mock()
+        client, web, rss, source = Mock(), Mock(), Mock(), Mock()
         client.read.side_effect = WeReadError("freq control -2041", review_id="MP_WXS_1234567890_abc")
         rss.fetch.side_effect = RSSError("not indexed")
         with self.assertRaises(WeReadError):
-            read_article(client, URL, web_client=web, fallback=rss, sleep=lambda _: None)
+            read_article(client, URL, web_client=web, source_client=source, fallback=rss, sleep=lambda _: None)
         web.read.assert_not_called()
+        source.read.assert_not_called()
 
     def test_rate_limit_or_challenge_does_not_retry(self):
         for error in (WeReadError("freq control -2041", status=499),

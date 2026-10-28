@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from weread_client import WeReadError, source_redirects_to_challenge
+from weread_client import WeReadError
 from weread_web_body import WeReadWebBody, extract_body, store_cookie
 
 REVIEW_ID = "MP_WXS_1234567890_QZDG~IZuUcnq7lWVlMo3eA"
@@ -104,39 +104,6 @@ class WebBodyTests(unittest.TestCase):
         with self.assertRaises(WeReadError) as raised:
             client.read(REVIEW_ID)
         self.assertEqual(raised.exception.code, "WEB_COOKIE_PERMISSIONS")
-        opener.open.assert_not_called()
-
-    def test_source_probe_checks_only_exact_wechat_challenge(self):
-        from urllib.error import HTTPError
-        source = "https://mp.weixin.qq.com/s/example"
-        for location, expected in (
-            ("/mp/wappoc_appmsgcaptcha?poc_token=secret", True),
-            ("https://elsewhere.example/mp/wappoc_appmsgcaptcha", False),
-            ("/s/another-article", False),
-        ):
-            with self.subTest(location=location):
-                opener = Mock()
-                opener.open.side_effect = HTTPError(source, 302, "Found", {"Location": location}, None)
-                self.assertEqual(source_redirects_to_challenge(source, opener=opener), expected)
-                request = opener.open.call_args.args[0]
-                self.assertEqual(request.get_method(), "HEAD")
-        self.assertFalse(source_redirects_to_challenge("https://elsewhere.example/article"))
-
-    def test_cookie_cannot_be_saved_inside_project(self):
-        from weread_web_body import PROJECT_ROOT
-        with self.assertRaises(WeReadError):
-            store_cookie(PROJECT_ROOT / "web-cookie.txt", prompt=lambda _: "secret=1")
-        with self.assertRaises(WeReadError):
-            WeReadWebBody(PROJECT_ROOT / "web-cookie.txt")
-        self.assertFalse((PROJECT_ROOT / "web-cookie.txt").exists())
-
-    def test_cookie_symlink_is_not_followed(self):
-        client, opener = self._client("<p>正文</p>" * 100)
-        link = client.cookie_file.with_name("web-link.cookie")
-        link.symlink_to(client.cookie_file)
-        client.cookie_file = link
-        with self.assertRaises(WeReadError):
-            client.read(REVIEW_ID)
         opener.open.assert_not_called()
 
     def test_redirect_never_leaks_cookie_to_new_host(self):

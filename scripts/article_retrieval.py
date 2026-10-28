@@ -1,4 +1,4 @@
-"""Bounded WeRead retries followed by an exact-item public RSS fallback."""
+"""Bounded WeRead retries, verified public page, authorized Web, then exact RSS."""
 
 import sys
 import time
@@ -26,13 +26,14 @@ def retryable(error):
 
 
 def read_article(client, url, account_name=None, fallback=None, sleep=time.sleep,
-                 web_client=None, review_id=None, title=None, published_at=None):
-    """Try eInk, optional authenticated Web, then exact public RSS."""
+                 web_client=None, review_id=None, title=None, published_at=None,
+                 source_client=None, preview=None):
+    """Try eInk, verified public body, authorized Web, then exact RSS."""
     fallback = fallback if fallback is not None else RSSFallback()
     last_error = None
     attempts = 0
     web_error = None
-    challenge_probed = False
+    source_error = None
     for retry in range(MAX_READ_RETRIES + 1):
         attempts += 1
         try:
@@ -45,16 +46,19 @@ def read_article(client, url, account_name=None, fallback=None, sleep=time.sleep
             published_at = exc.published_at or published_at
             if retry >= MAX_READ_RETRIES or not retryable(exc):
                 break
-            if exc.code == "SOURCE_CONTENT_INSUFFICIENT" and not challenge_probed:
-                challenge_probed = True
-                if getattr(client, "is_source_challenge", lambda _: False)(url):
-                    print("WeChat source redirects to verification; skip futile body retries", file=sys.stderr)
-                    break
             delay = RETRY_BACKOFF_SECONDS[retry]
             print("WeRead body unavailable; retry {}/{} in {}s".format(retry + 1, MAX_READ_RETRIES, delay), file=sys.stderr)
             sleep(delay)
-    if web_client is not None and review_id and not any(
-            word in str(last_error).lower() for word in ("freq control", "rate limit", "-2041")):
+    rate_limited = any(word in str(last_error).lower() for word in ("freq control", "rate limit", "-2041"))
+    if source_client is not None and not rate_limited and last_error.code in (
+            "SOURCE_CONTENT_INSUFFICIENT", "SOURCE_CONTENT_UNAVAILABLE"):
+        try:
+            return source_client.read(url, title=title, account_name=account_name,
+                                      published_at=published_at, preview=preview, review_id=review_id)
+        except WeReadError as exc:
+            source_error = exc
+            print("Public article body unavailable: {}".format(exc), file=sys.stderr)
+    if web_client is not None and review_id and not rate_limited:
         try:
             return web_client.read(review_id, title=title, account_name=account_name, published_at=published_at)
         except WeReadError as exc:
@@ -63,8 +67,9 @@ def read_article(client, url, account_name=None, fallback=None, sleep=time.sleep
     try:
         result = fallback.fetch(url, account_name)
     except RSSError as exc:
+        source_detail = "; original page: {}".format(source_error) if source_error is not None else ""
         web_detail = "; WeRead Web: {}".format(web_error) if web_error is not None else ""
-        raise WeReadError("WeRead failed after {} attempt(s): {}{}; RSS fallback unavailable: {}".format(
-            attempts, last_error, web_detail, exc), code=last_error.code) from exc
+        raise WeReadError("WeRead failed after {} attempt(s): {}{}{}; RSS fallback unavailable: {}".format(
+            attempts, last_error, source_detail, web_detail, exc), code=last_error.code) from exc
     print("Article matched and recovered from public RSS after {} WeRead attempt(s)".format(attempts), file=sys.stderr)
     return result
