@@ -12,6 +12,7 @@ import subprocess
 from urllib.parse import urlsplit
 
 CLI_VERSION = "0.1.2"
+MIN_UNVERIFIED_BODY_CHARACTERS = 80
 ACCOUNT_ID = re.compile(r"^MP_WXS_[0-9]+$")
 INSTALL_PREFIX = Path.home() / ".local/share/wechat-download-skill/weread-omni"
 INSTALL_SCRIPT = Path(__file__).with_name("install_weread_cli.sh")
@@ -129,6 +130,17 @@ class WeReadClient:
         result = self.call("public-accounts", "read-article", url, timeout=150)
         if not isinstance(result, dict) or result.get("status") != "readable":
             raise WeReadError("WeRead did not return a readable full article")
-        if not result.get("markdown") and not result.get("contentHtml"):
-            raise WeReadError("WeRead returned an empty article body")
+        markdown = result.get("markdown")
+        if not isinstance(markdown, str) or not markdown.strip():
+            raise WeReadError("WeRead returned no readable article text")
+        # A WeChat anti-scraping shell may contain only the author and controls while
+        # weread-omni still marks it "readable" with completeness="unverified".
+        # Fail closed instead of writing metadata and calling it a full article.
+        substantive = markdown
+        for label in ("阅读原文", "不喜欢", "原创", str(result.get("accountName") or "")):
+            if label:
+                substantive = substantive.replace(label, "")
+        if (result.get("completeness") != "verified"
+                and len(re.sub(r"\s+", "", substantive)) < MIN_UNVERIFIED_BODY_CHARACTERS):
+            raise WeReadError("WeRead returned only a short, unverified article preview; full body unavailable")
         return result

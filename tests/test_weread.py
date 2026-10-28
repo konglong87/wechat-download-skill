@@ -54,6 +54,20 @@ class WeReadTests(unittest.TestCase):
         with self.assertRaisesRegex(WeReadError, "freq control"):
             client.articles(ACCOUNT)
 
+    def test_chrome_only_preview_is_not_saved(self):
+        preview = {
+            "status": "readable", "completeness": "unverified",
+            "title": "示例标题", "accountName": "小众软件",
+            "markdown": "原创 青小蛙 小众软件\n\n阅读原文 不喜欢",
+            "contentHtml": '<div id="js_article"><p>阅读原文 不喜欢</p></div>',
+        }
+        runner = Mock(return_value=Mock(returncode=0, stdout=json.dumps(preview), stderr=""))
+        client = WeReadClient(executable="/some/cli", runner=runner)
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaisesRegex(WeReadError, "full body unavailable"):
+                download_url(client, ARTICLE_URL, d)
+            self.assertEqual(list(Path(d).glob("*.md")), [])
+
     def test_paginated_articles(self):
         first = [{"reviewId": "r{}".format(i), "title": str(i)} for i in range(20)]
         client = FakeClient({None: {"articles": first, "nextOffset": 20}, 20: {"articles": [{"reviewId": "r20", "title": "20"}]}})

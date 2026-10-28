@@ -1,6 +1,6 @@
 # wechat-download
 
-一个用于下载微信公众号文章的 agent skill。**已实测的公开 RSS 路线**可免登录下载收录号的近期正文；**微信读书路线**可面向更多公众号，但仍需真人扫码端到端验收。旧的微信公众平台后台接口保留为兼容模式，但文章列表在 2026 年的实际测试中返回 `ret=200013, freq control`，不要把服务健康检查当作批量下载成功。
+一个用于下载微信公众号文章的 agent skill。**已实测的公开 RSS 路线**可免登录下载收录号的近期正文；**微信读书路线**已完成真人扫码测试，但当前账号的搜索、列表遭遇官方客户端真人验证 `-2041`；已知文章链接返回的只有页面外壳，不能当作正文下载成功。旧的微信公众平台后台接口保留为兼容模式，但文章列表在 2026 年的实际测试中返回 `ret=200013, freq control`，不要把服务健康检查当作批量下载成功。
 
 English: [README.en.md](README.en.md)
 
@@ -42,7 +42,7 @@ python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/ARTICLE' ./we
 
 也可以设置 `WEREAD_CLI=/path/to/weread-omni` 使用你已有的 CLI，或用 `WEREAD_ACCOUNT=other` 指定已登录账号。`--refresh` 可强制重新抓取而非使用微信读书 CLI 的本地缓存。
 
-## 微信读书实现与输出（待真人扫码验证）
+## 微信读书实现与输出（已实测，目前受阻）
 
 ```text
 scripts/download_weread.py → scripts/weread_client.py → weread-omni (MIT) → 微信读书接口
@@ -51,8 +51,10 @@ scripts/download_weread.py → scripts/weread_client.py → weread-omni (MIT) �
 
 - `install_weread_cli.sh` 将固定版本的 `weread-omni@0.1.2` 安装到 `~/.local/share/wechat-download-skill/weread-omni/`，不全局覆盖 npm 包；认证信息由该 CLI 保存在自己的用户配置目录，skill 不读取或输出 Cookie。
 - `search` 通过微信读书搜索公众号；`list` 和 `download` 使用 `MP_WXS_<数字>`，首次列表请求不带 offset，后续按微信读书游标分页；最多处理 1,000 篇，默认 200 篇。
-- 输出为每篇一个 `.md`，包含原文链接、公众号名和正文；已保存的文件跳过。**图片暂保留远程 URL，不下载图片文件。**部分失败写入 `failures.json`，命令返回非零退出码；遇到频控/验证会停止，避免连续触发风控。
+- 仅在正文通过最低限度的内容检查后才输出每篇一个 `.md`；上游把仅含作者/“阅读原文”等按钮的页面标为 `readable` 时，适配器会拒绝保存（2026-10-28 真人扫码后实际发现并修复的误报）。已保存的文件跳过。**图片暂保留远程 URL，不下载图片文件。**部分失败写入 `failures.json`，命令返回非零退出码；遇到频控/验证会停止，避免连续触发风控。
 - 不会自动关注公众号。若目标号必须先在微信读书关注，请在微信读书客户端操作，或者明确授权后再使用 `weread-omni public-accounts subscribe`。
+
+2026-10-28 端到端实测：微信读书扫码登录和 `status` 认证成功；「小众软件」搜索 `/store/search` 与已知账号 ID 的文章列表 `/mp/chapters` 均返回 `-2041`，提示需要在官方客户端完成真人验证。已知文章链接的 `read-article` 返回 `status=readable` 但 `completeness=unverified`，仅 21 字“原创/作者/阅读原文/不喜欢”；强制刷新及第二篇均一样，原文页直接请求也返回验证页面。本项目不会绕过验证，不能声称该路线目前可自动下载完整正文。若你在官方微信读书 App 中完成提示的验证，可再重试；目前已实测可用的范围仅是上方公开 RSS 收录号的近期内容。
 
 > 微信读书使用非公开接口，列表是它持有的文章索引，不保证包含目标公众号的全部历史、已删文章或付费全文。登录可能需要微信读书 App 端二次验证；请正常完成，勿绕过验证。仅归档你有权访问和使用的内容。
 
