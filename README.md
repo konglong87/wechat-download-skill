@@ -1,12 +1,26 @@
 # wechat-download
 
-一个用于下载微信公众号文章的 agent skill。**新增微信读书路线（待完成真人扫码端到端验收）**：用微信读书发现公众号与文章，再读取原文并保存为 Markdown。旧的微信公众平台后台接口保留为兼容模式，但文章列表在 2026 年的实际测试中返回 `ret=200013, freq control`，不要把服务健康检查当作批量下载成功。
+一个用于下载微信公众号文章的 agent skill。**已实测的公开 RSS 路线**可免登录下载收录号的近期正文；**微信读书路线**可面向更多公众号，但仍需真人扫码端到端验收。旧的微信公众平台后台接口保留为兼容模式，但文章列表在 2026 年的实际测试中返回 `ret=200013, freq control`，不要把服务健康检查当作批量下载成功。
 
 English: [README.en.md](README.en.md)
 
+## 免登录：公开 RSS（已完成真实下载验收）
+
+先查公开目录；找到后使用返回的 feed URL，避免重复检索：
+
+```bash
+python3 scripts/download_rss.py search "小众软件"
+python3 scripts/download_rss.py list 'https://wechat2rss.xlab.app/feed/3261d5a75cfef238650a2cabd4bbf99669c2f334.xml'
+python3 scripts/download_rss.py download 'https://wechat2rss.xlab.app/feed/3261d5a75cfef238650a2cabd4bbf99669c2f334.xml' 1 ./wechat_downloads
+```
+
+此路由只接受该站固定格式的 `https://wechat2rss.xlab.app/feed/<40位哈希>.xml`；按名称搜索仅覆盖公开目录收录号，直接使用 RSS 的 `content:encoded` 正文保存为 `.txt`，**不请求受限的微信原文页面**，不需要微信读书或公众号后台登录。2026-10-28 实测「小众软件」源提供 20 篇、最近更新至 10 月 27 日；1 篇文章实际写入 3,223 字节并读回。RSS 收录范围、更新频率和正文完整度均由第三方决定，**不保证任意公众号、全量历史或与原文逐字相同**。图片仅保留远程 URL。
+
+若目录无目标号或需更多历史，再尝试下方微信读书路线。
+
 ## 快速开始
 
-安装 skill 后，在 Claude Code / agent 里说“下载 XXX 公众号最近 20 篇文章”。Agent 会安装所需的开源 CLI；你需要**用已开通微信读书的微信号扫码登录一次**。微信读书与公众号后台是两套独立登录态。
+安装 skill 后，在 Claude Code / agent 里说“下载 XXX 公众号最近 20 篇文章”。若公开 RSS 目录已收录该号，无需安装或登录；否则可尝试微信读书路线，由 Agent 安装开源 CLI，并请你**用已开通微信读书的微信号扫码登录一次**。微信读书与公众号后台是两套独立登录态。
 
 手动执行（macOS / Linux，Node.js **>=22.13.0**，Python **>=3.9**）：
 
@@ -28,7 +42,7 @@ python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/ARTICLE' ./we
 
 也可以设置 `WEREAD_CLI=/path/to/weread-omni` 使用你已有的 CLI，或用 `WEREAD_ACCOUNT=other` 指定已登录账号。`--refresh` 可强制重新抓取而非使用微信读书 CLI 的本地缓存。
 
-## 实现与输出
+## 微信读书实现与输出（待真人扫码验证）
 
 ```text
 scripts/download_weread.py → scripts/weread_client.py → weread-omni (MIT) → 微信读书接口

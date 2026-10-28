@@ -1,10 +1,20 @@
 # wechat-download
 
-An agent skill for downloading WeChat official-account articles. **An experimental WeRead path is available (live QR-login validation pending)** to discover article links and retrieve readable content. The legacy WeChat MP article-list endpoint returned `ret=200013, freq control` in the October 2026 live test; an API health check does not establish that batch downloads work.
+An agent skill for downloading WeChat official-account articles. **A public RSS path has been live-tested for catalogued accounts**; an experimental WeRead path targets broader discovery (live QR-login validation pending) to discover article links and retrieve readable content. The legacy WeChat MP article-list endpoint returned `ret=200013, freq control` in the October 2026 live test; an API health check does not establish that batch downloads work.
+
+## Login-free public RSS (live-tested)
+
+```bash
+python3 scripts/download_rss.py search "小众软件"
+python3 scripts/download_rss.py list 'https://wechat2rss.xlab.app/feed/3261d5a75cfef238650a2cabd4bbf99669c2f334.xml'
+python3 scripts/download_rss.py download 'https://wechat2rss.xlab.app/feed/3261d5a75cfef238650a2cabd4bbf99669c2f334.xml' 1 ./wechat_downloads
+```
+
+This adapter accepts only fixed-form HTTPS Wechat2RSS feed URLs; name search covers the public catalogue. It saves each feed item’s `content:encoded` body to `.txt`. It does not bypass WeChat verification or require login. A live October 28, 2026 test found 20 recent entries for 小众软件 and saved/read back one 3,223-byte article. The third-party feed does **not** guarantee arbitrary accounts, complete history, or independently verified full text. Images remain remote links.
 
 ## Quick start
 
-Requires Node.js **>=22.13.0**, Python **>=3.9**, and a WeRead-enabled WeChat account. WeRead login is separate from WeChat MP administrator login.
+The public RSS route requires only Python **>=3.9**. The broader experimental WeRead route requires Node.js **>=22.13.0**, Python **>=3.9**, and a WeRead-enabled WeChat account. WeRead login is separate from WeChat MP administrator login.
 
 ```bash
 bash scripts/install_weread_cli.sh
