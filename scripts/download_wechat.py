@@ -114,8 +114,8 @@ def download_all(fakeid, count=200, output_dir=None):
         params = {"fakeid": fakeid, "begin": begin, "count": batch_size}
         data = _get("/api/public/articles", params)
         if not data.get("success"):
-            print(f"  Error: {data.get('error')}")
-            break
+            print(f"  Error: {data.get('error')}", file=sys.stderr)
+            return 1
         batch = data["data"]["articles"]
         if not batch:
             break
@@ -127,6 +127,9 @@ def download_all(fakeid, count=200, output_dir=None):
         time.sleep(0.5)
 
     total = len(all_articles)
+    if not total:
+        print("No articles returned; nothing was downloaded.", file=sys.stderr)
+        return 1
     print(f"\n{total} articles total. Downloading content...\n")
 
     # --- 2. Download articles with resume ---
@@ -211,6 +214,7 @@ def download_all(fakeid, count=200, output_dir=None):
     )
     print(f"Total size: {total_size/1024:.0f} KB ({total_size/1024/1024:.2f} MB)")
     print(f"Output: {out}")
+    return 1 if failures else 0
 
 
 # --------------- cli ---------------
@@ -244,7 +248,7 @@ def main():
         fakeid = sys.argv[2]
         count = int(sys.argv[3]) if len(sys.argv) > 3 else 200
         out = sys.argv[4] if len(sys.argv) > 4 else None
-        download_all(fakeid, count, out)
+        return download_all(fakeid, count, out)
     elif cmd == "rss":
         if len(sys.argv) < 3:
             print("Usage: python3 download_wechat.py rss <fakeid>")

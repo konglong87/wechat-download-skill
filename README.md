@@ -1,102 +1,49 @@
 # wechat-download
 
-这是一个 Claude Code skill，用来下载微信公众号文章。
+一个用于下载微信公众号文章的 agent skill。**新增微信读书路线（待完成真人扫码端到端验收）**：用微信读书发现公众号与文章，再读取原文并保存为 Markdown。旧的微信公众平台后台接口保留为兼容模式，但文章列表在 2026 年的实际测试中返回 `ret=200013, freq control`，不要把服务健康检查当作批量下载成功。
 
-English version: [README.en.md](README.en.md)
+English: [README.en.md](README.en.md)
 
-## 最简单的用法
+## 快速开始
 
-安装好这个 skill 之后，直接在 Claude Code / agent 里说：
+安装 skill 后，在 Claude Code / agent 里说“下载 XXX 公众号最近 20 篇文章”。Agent 会安装所需的开源 CLI；你需要**用已开通微信读书的微信号扫码登录一次**。微信读书与公众号后台是两套独立登录态。
 
-```text
-下载 XXX 的公众号文章
-```
-
-或者：
-
-```text
-帮我下载 XXX 公众号最近 200 篇文章
-```
-
-就这样。你不需要手动安装底层 API 服务，也不需要手动装这个 skill 的 Python 依赖。agent 会按 skill 里的说明自动启动本地服务；如果本机还没有 `wechat-download-api`，启动脚本会自动下载；服务依赖也会自动安装。
-
-唯一需要你手动做的是：第一次启动后，按提示打开登录页，用公众号管理员微信扫码登录。
-
-## 安装
+手动执行（macOS / Linux，Node.js **>=22.13.0**，Python **>=3.9**）：
 
 ```bash
-git clone git@github.com:konglong87/wechat-download-skill.git ~/.claude/skills/wechat-download
+bash scripts/install_weread_cli.sh
+python3 scripts/download_weread.py login
+python3 scripts/download_weread.py status
+python3 scripts/download_weread.py search "人民日报"
+# 搜索结果中确认 MP_WXS_<数字>，不可使用旧的 fakeid
+python3 scripts/download_weread.py list MP_WXS_1234567890 0 10
+python3 scripts/download_weread.py download MP_WXS_1234567890 20 ./wechat_downloads
 ```
 
-如果你已经把本仓库放到别的位置，也可以链接到 Claude skill 目录：
+已有文章链接时，不必搜索公众号：
 
 ```bash
-ln -s /path/to/wechat-download-skill ~/.claude/skills/wechat-download
+python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/ARTICLE' ./wechat_downloads
 ```
 
-## Agent 会自动做什么
+也可以设置 `WEREAD_CLI=/path/to/weread-omni` 使用你已有的 CLI，或用 `WEREAD_ACCOUNT=other` 指定已登录账号。`--refresh` 可强制重新抓取而非使用微信读书 CLI 的本地缓存。
 
-当你让 agent 下载公众号文章时，它会：
-
-1. 检查本地 `wechat-download-api` 服务是否可用。
-2. 如未启动，运行 `scripts/start_wechat_api.sh`。
-3. 如本机没有 `wechat-download-api`，自动 clone 到 skill 目录下。
-4. 自动安装底层服务需要的 Python 包。
-5. 引导你打开 `http://localhost:8765/login.html` 扫码登录。
-6. 搜索公众号，获取 `fakeid`。
-7. 批量下载文章内容到本地目录。
-
-默认端口是 `8765`。如果你已经用 upstream `wechat-download-api` 的默认端口 `5000` 启动了服务，agent 可以通过 `WECHAT_API_URL=http://localhost:5000` 使用它。
-
-## 手动命令
-
-通常不需要手动执行这些命令；它们主要给 agent 或排障时使用。
-
-```bash
-cd ~/.claude/skills/wechat-download
-
-bash scripts/start_wechat_api.sh               # 启动服务，默认端口 8765
-python3 scripts/download_wechat.py status      # 检查服务状态
-python3 scripts/download_wechat.py search "公众号名称"
-python3 scripts/download_wechat.py download "fakeid" 200 ./output
-python3 scripts/download_wechat.py list "fakeid" 0 50
-python3 scripts/download_wechat.py rss "fakeid"
-```
-
-## 扫码登录
-
-下载公众号历史文章需要通过微信公众平台后台接口获取文章列表，所以需要一个微信公众号管理员账号登录。
-
-1. 打开 `http://localhost:8765/login.html`
-2. 用公众号管理员微信扫码
-3. 登录成功后凭证会保存到本地 `.env`
-4. 凭证通常约 4 天后过期，过期后重新扫码即可
-
-如果你没有微信公众号管理员账号，agent 只能尝试搜索引擎、转载平台或镜像站等替代方案，覆盖率会低很多。
-
-## 文件结构
+## 实现与输出
 
 ```text
-wechat-download/
-├── SKILL.md
-├── README.md
-├── README.en.md
-└── scripts/
-    ├── download_wechat.py
-    ├── start_wechat_api.sh
-    └── stop_wechat_api.sh
+scripts/download_weread.py → scripts/weread_client.py → weread-omni (MIT) → 微信读书接口
+                                                  ↘ 微信原文链接与正文
 ```
 
-## 常见问题
+- `install_weread_cli.sh` 将固定版本的 `weread-omni@0.1.2` 安装到 `~/.local/share/wechat-download-skill/weread-omni/`，不全局覆盖 npm 包；认证信息由该 CLI 保存在自己的用户配置目录，skill 不读取或输出 Cookie。
+- `search` 通过微信读书搜索公众号；`list` 和 `download` 使用 `MP_WXS_<数字>`，首次列表请求不带 offset，后续按微信读书游标分页；最多处理 1,000 篇，默认 200 篇。
+- 输出为每篇一个 `.md`，包含原文链接、公众号名和正文；已保存的文件跳过。**图片暂保留远程 URL，不下载图片文件。**部分失败写入 `failures.json`，命令返回非零退出码；遇到频控/验证会停止，避免连续触发风控。
+- 不会自动关注公众号。若目标号必须先在微信读书关注，请在微信读书客户端操作，或者明确授权后再使用 `weread-omni public-accounts subscribe`。
 
-| 问题 | 处理方式 |
-| --- | --- |
-| 端口被占用 | 让 agent 换端口，或手动执行 `bash scripts/start_wechat_api.sh 9876` |
-| 登录过期 | 重新打开 `http://localhost:8765/login.html` 扫码 |
-| 触发微信安全验证 | 降低频率，浏览器打开提示 URL 完成验证，等待一段时间再试 |
-| 部分文章下载失败 | 文章可能被删除、访问受限、是广告/图片分享，通常跳过即可 |
-| `curl_cffi` 安装失败 | macOS 安装 Xcode CLT：`xcode-select --install` |
+> 微信读书使用非公开接口，列表是它持有的文章索引，不保证包含目标公众号的全部历史、已删文章或付费全文。登录可能需要微信读书 App 端二次验证；请正常完成，勿绕过验证。仅归档你有权访问和使用的内容。
 
-## 感谢底层项目
+## 旧接口（仅供兼容）
 
-本 skill 封装了 [tmwgsicp/wechat-download-api](https://github.com/tmwgsicp/wechat-download-api)。
+原 `scripts/start_wechat_api.sh` 和 `scripts/download_wechat.py` 仍可用于排障，且在已登录情况下可用 `/api/article` 处理**已知链接**。但是其按 fakeid 获取文章列表的微信后台入口在当前测试中受阻，不再作为推荐下载方式。旧批量脚本现在会对列表错误或空列表返回非零退出码，不会伪报成功。
+
+本项目保留对 [tmwgsicp/wechat-download-api](https://github.com/tmwgsicp/wechat-download-api) 的兼容；新的微信读书路线调用 [teng-lin/weread-omni](https://github.com/teng-lin/weread-omni)（MIT），未复制其源码。

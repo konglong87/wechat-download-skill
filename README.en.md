@@ -1,102 +1,27 @@
 # wechat-download
 
-A Claude Code skill for downloading WeChat Official Account articles.
+An agent skill for downloading WeChat official-account articles. **An experimental WeRead path is available (live QR-login validation pending)** to discover article links and retrieve readable content. The legacy WeChat MP article-list endpoint returned `ret=200013, freq control` in the October 2026 live test; an API health check does not establish that batch downloads work.
 
-Chinese version: [README.md](README.md)
+## Quick start
 
-## Simplest Usage
-
-After installing this skill, just tell Claude Code or your agent:
-
-```text
-Download articles from the XXX WeChat official account
-```
-
-Or:
-
-```text
-Download the latest 200 articles from the XXX WeChat official account
-```
-
-That's it. You do not need to manually install the underlying API service or any Python dependencies for this skill. The agent follows the skill instructions, starts the local service, downloads `wechat-download-api` if it is missing, and installs the service dependencies automatically.
-
-The only manual step is scanning the login QR code with a WeChat Official Account administrator account when prompted.
-
-## Installation
+Requires Node.js **>=22.13.0**, Python **>=3.9**, and a WeRead-enabled WeChat account. WeRead login is separate from WeChat MP administrator login.
 
 ```bash
-git clone git@github.com:konglong87/wechat-download-skill.git ~/.claude/skills/wechat-download
+bash scripts/install_weread_cli.sh
+python3 scripts/download_weread.py login  # scan the WeRead QR code
+python3 scripts/download_weread.py status
+python3 scripts/download_weread.py search "account name"
+python3 scripts/download_weread.py list MP_WXS_1234567890 0 10
+python3 scripts/download_weread.py download MP_WXS_1234567890 20 ./wechat_downloads
+python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/ARTICLE' ./wechat_downloads
 ```
 
-If you already cloned this repository somewhere else, link it into Claude's skill directory:
+Use the WeRead `MP_WXS_<digits>` account ID returned by search, not a legacy MP `fakeid`. To use an existing CLI, set `WEREAD_CLI`; to select a different logged-in account, set `WEREAD_ACCOUNT`. Use `--refresh` before a command to bypass the CLI cache.
 
-```bash
-ln -s /path/to/wechat-download-skill ~/.claude/skills/wechat-download
-```
+The adapter invokes the pinned MIT-licensed `weread-omni@0.1.2` and never reads or prints its cookies. The install script stores it in `~/.local/share/wechat-download-skill/weread-omni/`, not the global npm location. Results are one Markdown file per article, with source URL and metadata. Images remain remote URLs, not local image files. Completed files are skipped; failures are written to `failures.json` and return a nonzero exit status. Paging supports up to 1,000 articles per run (default 200), subject to upstream availability and rate limits.
 
-## What The Agent Does Automatically
+WeRead's unpublished article index can be incomplete; deleted, restricted, and paid content may not be readable. The skill does **not** silently subscribe to an account or bypass verification. Subscribe in the WeRead app, or explicitly approve a subscription first. Archive only content you may lawfully access and use.
 
-When you ask the agent to download articles, it will:
+The legacy `scripts/start_wechat_api.sh` and `scripts/download_wechat.py` remain for compatibility and known-link troubleshooting, but are no longer the recommended batch route. The old downloader now reports failed/empty lists as errors instead of claiming success.
 
-1. Check whether the local `wechat-download-api` service is available.
-2. Run `scripts/start_wechat_api.sh` if the service is not running.
-3. Clone `wechat-download-api` into the skill directory if it is missing.
-4. Install the Python packages required by the underlying service.
-5. Ask you to open `http://localhost:8765/login.html` and scan the QR code.
-6. Search for the official account and get its `fakeid`.
-7. Batch download article content into a local output directory.
-
-The default port is `8765`. If you already started upstream `wechat-download-api` on its default port `5000`, the agent can use it with `WECHAT_API_URL=http://localhost:5000`.
-
-## Manual Commands
-
-You usually do not need these. They are mainly for the agent or troubleshooting.
-
-```bash
-cd ~/.claude/skills/wechat-download
-
-bash scripts/start_wechat_api.sh               # Start service on port 8765
-python3 scripts/download_wechat.py status      # Check service health
-python3 scripts/download_wechat.py search "account name"
-python3 scripts/download_wechat.py download "fakeid" 200 ./output
-python3 scripts/download_wechat.py list "fakeid" 0 50
-python3 scripts/download_wechat.py rss "fakeid"
-```
-
-## Login
-
-Downloading historical account articles requires access to WeChat Official Platform article-list APIs, so you need to log in with a WeChat Official Account administrator account.
-
-1. Open `http://localhost:8765/login.html`
-2. Scan the QR code with the administrator's WeChat
-3. Credentials are saved locally to `.env`
-4. Credentials usually expire after about 4 days; scan again when needed
-
-If you do not have a WeChat Official Account administrator account, the agent can only try fallback approaches such as search engines, repost platforms, or mirror sites. Coverage will be much lower.
-
-## Files
-
-```text
-wechat-download/
-├── SKILL.md
-├── README.md
-├── README.en.md
-└── scripts/
-    ├── download_wechat.py
-    ├── start_wechat_api.sh
-    └── stop_wechat_api.sh
-```
-
-## Common Issues
-
-| Issue | Fix |
-| --- | --- |
-| Port is already in use | Ask the agent to use another port, or run `bash scripts/start_wechat_api.sh 9876` |
-| Login expired | Open `http://localhost:8765/login.html` and scan again |
-| WeChat security verification | Slow down, open the prompted URL in a browser, complete verification, and retry later |
-| Some articles fail | The article may be deleted, restricted, an ad, or image-only; skipping is usually fine |
-| `curl_cffi` install fails | On macOS, install Xcode CLT with `xcode-select --install` |
-
-## Underlying Project
-
-This skill wraps [tmwgsicp/wechat-download-api](https://github.com/tmwgsicp/wechat-download-api).
+Uses [teng-lin/weread-omni](https://github.com/teng-lin/weread-omni) (MIT) as an external CLI and retains compatibility with [tmwgsicp/wechat-download-api](https://github.com/tmwgsicp/wechat-download-api). No third-party source code is copied into this repository.

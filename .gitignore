@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .DS_Store
 *.bak
+# Default WeRead output and local runtime dependencies
+wechat_downloads/
+node_modules/
