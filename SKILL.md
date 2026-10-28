@@ -1,7 +1,7 @@
 ---
 name: wechat-download
-description: Download, archive, or search WeChat official-account (公众号) articles, using verified public RSS for indexed recent articles; WeRead search/list work after authentication, but full-body retrieval remains unverified or insufficient.
-version: 1.2.2
+description: Download, archive, or search WeChat official-account (公众号) articles, using verified public RSS for indexed recent articles; WeRead search/list work after authentication and some articles download; others return only a shell, so verify each body.
+version: 1.2.3
 ---
 
 # 微信公众号文章下载
@@ -9,7 +9,7 @@ version: 1.2.2
 ## 架构与边界
 
 - **已实测免登录备选**：`download_rss.py → 公开 Wechat2RSS 目录/Feed → content:encoded → 本地 .txt`。只适用于目录收录的号与 Feed 当前提供的近期文章；第三方内容未独立核对全文完整度。2026-10-28 实测一篇正文真实落盘、读回和浏览器截图均通过；随后该第三方 Feed 出现 TLS/超时或响应不完整，可用性需每次实测。
-- **已真人扫码测试但目前受阻的扩展路线**：`download_weread.py → weread_client.py → weread-omni@0.1.2 (MIT) → 微信读书索引/原文`。不能把旧公众号后台登录当成微信读书登录。2026-10-28 实测扫码与认证通过；搜索和列表最初 `-2041`，稍后重试恢复成功，用户手机 App 没有二次验证提示。已知链接仍只返回页面外壳或正文不足，适配器会拒绝将其保存为完整正文。
+- **已真人扫码并逐篇验收的扩展路线**：`download_weread.py → weread_client.py → weread-omni@0.1.2 (MIT) → 微信读书索引/原文`。不能把旧公众号后台登录当成微信读书登录。2026-10-28 实测扫码与认证通过；搜索和列表最初 `-2041`，稍后重试恢复成功，用户手机 App 没有二次验证提示。部分已知链接只返回页面外壳或正文不足，适配器会拒绝保存；另一个用户指定链接成功保存约 4 万字节 Markdown，需逐篇验证。
 - **旧路由**：`download_wechat.py → wechat-download-api → 微信公众平台后台` 保留兼容；文章列表实测 `ret=200013, freq control`，不要依赖其批量下载。登录、健康检查或搜索成功不等于列表成功。
 
 所有路线都必须尊重内容权限、版权和平台验证；不得绕过验证码或风控。公开 RSS 只读取目录和 HTTPS feed，不抓取验证页。
@@ -46,5 +46,5 @@ CLI 可用 `WEREAD_CLI=/path/to/weread-omni` 指定；多账号用 `WEREAD_ACCOU
 ## 验证与保留
 
 - 单元测试：`python3 -m unittest discover -s tests -v`。
-- RSS 真实验收检查目录命中、Feed 新鲜度、`content:encoded`、实际文件和截图；微信读书真实验收则需扫码后的账号状态、搜索、列表与文件读回。已在 2026-10-28 完成真人扫码和认证测试，搜索/列表后来恢复，但已知文章仍无完整正文；不要把暂时性 `-2041` 等同于手机有可操作的验证入口。
+- RSS 真实验收检查目录命中、Feed 新鲜度、`content:encoded`、实际文件和截图；微信读书真实验收则需扫码后的账号状态、搜索、列表与文件读回。已在 2026-10-28 完成真人扫码和认证测试，搜索/列表后来恢复，其中两篇仍无完整正文、另一篇成功落盘并截图验收；不要把暂时性 `-2041` 等同于手机有可操作的验证入口，也不要据单篇成功保证所有文章。
 - 测试中间下载目录可清理；真实凭证在用户家目录，不要删除、输出或上传。旧服务启动时只能绑定到 `127.0.0.1`，不可把未鉴权的管理接口暴露给局域网。

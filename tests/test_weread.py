@@ -68,6 +68,20 @@ class WeReadTests(unittest.TestCase):
                 download_url(client, ARTICLE_URL, d)
             self.assertEqual(list(Path(d).glob("*.md")), [])
 
+    def test_long_unverified_article_is_saved(self):
+        article = {
+            "status": "readable", "completeness": "unverified",
+            "title": "示例标题", "accountName": "示例公众号",
+            "markdown": "有意义的正文内容。" * 100,
+        }
+        runner = Mock(return_value=Mock(returncode=0, stdout=json.dumps(article), stderr=""))
+        client = WeReadClient(executable="/some/cli", runner=runner)
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(download_url(client, ARTICLE_URL, d), 0)
+            saved = list(Path(d).glob("*.md"))
+            self.assertEqual(len(saved), 1)
+            self.assertIn("有意义的正文内容", saved[0].read_text(encoding="utf-8"))
+
     def test_paginated_articles(self):
         first = [{"reviewId": "r{}".format(i), "title": str(i)} for i in range(20)]
         client = FakeClient({None: {"articles": first, "nextOffset": 20}, 20: {"articles": [{"reviewId": "r20", "title": "20"}]}})

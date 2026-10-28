@@ -1,6 +1,6 @@
 # wechat-download
 
-一个用于下载微信公众号文章的 agent skill。**已实测的公开 RSS 路线**在 Feed 可访问时可免登录下载收录号的近期正文；**微信读书路线**已完成真人扫码测试，搜索和列表目前可用，但已知文章链接只返回页面外壳，不能当作正文下载成功。旧的微信公众平台后台接口保留为兼容模式，但文章列表在 2026 年的实际测试中返回 `ret=200013, freq control`，不要把服务健康检查当作批量下载成功。
+一个用于下载微信公众号文章的 agent skill。**已实测的公开 RSS 路线**在 Feed 可访问时可免登录下载收录号的近期正文；**微信读书路线**已完成真人扫码测试，搜索和列表可用，部分已知链接可下载正文；另一些链接仍只返回页面外壳，必须逐篇验收。旧的微信公众平台后台接口保留为兼容模式，但文章列表在 2026 年的实际测试中返回 `ret=200013, freq control`，不要把服务健康检查当作批量下载成功。
 
 English: [README.en.md](README.en.md)
 
@@ -42,7 +42,7 @@ python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/ARTICLE' ./we
 
 也可以设置 `WEREAD_CLI=/path/to/weread-omni` 使用你已有的 CLI，或用 `WEREAD_ACCOUNT=other` 指定已登录账号。`--refresh` 可强制重新抓取而非使用微信读书 CLI 的本地缓存。
 
-## 微信读书实现与输出（已实测，目前受阻）
+## 微信读书实现与输出（已实测，逐篇验证）
 
 ```text
 scripts/download_weread.py → scripts/weread_client.py → weread-omni (MIT) → 微信读书接口
@@ -55,6 +55,8 @@ scripts/download_weread.py → scripts/weread_client.py → weread-omni (MIT) �
 - 不会自动关注公众号。若目标号必须先在微信读书关注，请在微信读书客户端操作，或者明确授权后再使用 `weread-omni public-accounts subscribe`。
 
 2026-10-28 端到端实测：微信读书扫码登录和 `status` 认证成功，手机 App 登录设备页也显示 BOOX 设备。搜索 `/store/search` 和文章列表 `/mp/chapters` 初次返回 `-2041`，稍后重试均恢复成功，**没有看到额外的 App 安全验证入口**，不能断言需手机二次验证。但正文仍受阻：两篇已知链接的 `read-article` 标记 `status=readable`、`completeness=unverified`，实际仅 21 字页面外壳；一篇较早文章直接返回 `SOURCE_CONTENT_INSUFFICIENT`。强制刷新仍不能得到全文，原文页直接请求也曾返回验证页面。当前微信读书可自动发现文章索引，尚不能可靠下载完整正文；公开 RSS 仅在第三方 Feed 可访问且收录目标号时可下载近期内容。
+
+同日对用户提供的 [匿名测试公众号 文章](https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE) 做了实际下载：`--refresh url` 成功保存 40,490 字节 Markdown（正文约 19,832 字符），检查了开头、中段、结尾并生成截图，输出位于 `wechat_downloads/link-validation/`（本地验收文件不纳入仓库）。上游仍显示 `completeness=unverified`，因此这是“读到了完整形态的正文”的验收，不保证与微信原文逐字一致，也不能推断任意文章都可下载；已知“小众软件”样本仍被拒绝。
 
 > 微信读书使用非公开接口，列表是它持有的文章索引，不保证包含目标公众号的全部历史、已删文章或付费全文。登录可能需要微信读书 App 端二次验证；请正常完成，勿绕过验证。仅归档你有权访问和使用的内容。
 
