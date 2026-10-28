@@ -46,10 +46,19 @@ def _entry_title(entry, fallback):
 
 
 def _existing_article(output_dir, digest):
-    return next(
-        (p for p in output_dir.glob(digest + "_*.md") if p.stat().st_size > 100),
-        None,
-    )
+    for path in output_dir.glob(digest + "_*.md"):
+        if path.stat().st_size <= 100:
+            continue
+        text = path.read_text(encoding="utf-8")
+        images = re.findall(r"!\[[^]]*\]\((" + re.escape(digest) + r"_images/[0-9]{2}\.(?:jpg|png|gif|webp))\)", text)
+        expected = re.search(r"原文图片（(\d+) 张", text)
+        if ("微信公众号图片分享" in text or "_images/" in text) and (
+                not images or not expected or len(images) != int(expected.group(1)) or not all(
+                (output_dir / filename).is_file() and (output_dir / filename).stat().st_size >= 500
+                for filename in images)):
+            continue
+        return path
+    return None
 
 
 def _save_article(output_dir, key, title, url, entry, result):
@@ -73,10 +82,41 @@ def _save_article(output_dir, key, title, url, entry, result):
         "---",
         "",
     ]
-    path.write_text("\n".join(metadata) + markdown + "\n", encoding="utf-8")
-    if path.stat().st_size <= 100:
-        path.unlink()
-        raise WeReadError("Saved article is unexpectedly short")
+    assets = result.get("assets") or []
+    asset_dir = output_dir / (digest + "_images")
+    created = []
+    staged = []
+    temporary_article = path.with_suffix(".md.part")
+    try:
+        if assets:
+            asset_dir.mkdir(exist_ok=True)
+            for asset in assets:
+                filename, data = asset["filename"], asset["data"]
+                if not re.fullmatch(r"[0-9]{2}\.(?:jpg|png|gif|webp)", filename) or not isinstance(data, bytes):
+                    raise WeReadError("Invalid image-post asset", code="PICTURE_INVALID_IMAGE")
+                destination = asset_dir / filename
+                temporary = asset_dir / (filename + ".part")
+                existed = destination.exists()
+                temporary.write_bytes(data)
+                staged.append(temporary)
+                temporary.replace(destination)
+                if not existed:
+                    created.append(destination)
+        temporary_article.write_text("\n".join(metadata) + markdown + "\n", encoding="utf-8")
+        if temporary_article.stat().st_size <= 100:
+            raise WeReadError("Saved article is unexpectedly short")
+        temporary_article.replace(path)
+    except (OSError, WeReadError) as exc:
+        temporary_article.unlink(missing_ok=True)
+        for temporary in staged:
+            temporary.unlink(missing_ok=True)
+        for file in created:
+            file.unlink(missing_ok=True)
+        if asset_dir.is_dir() and not any(asset_dir.iterdir()):
+            asset_dir.rmdir()
+        if isinstance(exc, WeReadError):
+            raise
+        raise WeReadError("Could not save article and all original images") from exc
     return path, True
 
 

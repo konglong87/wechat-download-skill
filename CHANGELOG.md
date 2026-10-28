@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Re-test three newest 匿名测试公众号 posts individually. Fix an upstream false positive: the Ontology article contains the phrase “需要验证” in its genuine body, but weread-omni scans the entire HTML and rejects it. A strict normal-page body adapter now saves this article (42,669-byte Markdown, 17,671 body characters); the other two expose only 326/447-character previews and remain failures. Actual newest-three outcome: **1/3**.
+- Add strict `item_show_type=8` image-post support: parse the actual `picture_page_info_list`, download every HTTPS original image from the allowlisted CDN, verify image magic and bounds, save atomic Markdown plus local `_images/` assets, and treat missing files as incomplete. Latest-three 匿名测试公众号 now archive **3/3**: one normal text article and two image galleries (7 + 8 images; 15/15 decoded and dimension-checked). No OCR claim. A repeat batch returned `Skipped: 3, Failed: 0` and cleared `failures.json`.
+
+- Re-test three newest 匿名测试公众号 posts individually. Fix an upstream false positive: the Ontology article contains the phrase “需要验证” in its genuine body, but weread-omni scans the entire HTML and rejects it. A strict normal-page body adapter now saves this article (42,669-byte Markdown, 17,671 body characters); the other two expose only 326/447-character previews and remain failures. At that intermediate stage the outcome was **1/3**; subsequent image-gallery support archived the remaining two media posts.
 - Remove the previous HEAD-based challenge guard: a known article that succeeds with `--refresh` also redirects on independent HEAD. Do not equate HEAD status with the WeRead GET body. Reject actual verification redirects during the bounded page request instead.
 
 - Add an opt-in, separate WeRead Web body adapter using a user-supplied owner-only Cookie file (`web-cookie` hidden prompt); never log or commit credentials, reject redirects, login/challenge shells, and short bodies. Keep exact RSS as the final fallback. Authenticated Web body success is not yet verified.

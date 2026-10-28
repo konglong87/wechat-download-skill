@@ -16,6 +16,7 @@ import urllib.request
 from download_rss import article_text
 from weread_client import WeReadError, article_url
 from weread_web_body import ContentFragment
+from wechat_picture_body import download_picture_post
 
 # Keep aligned with weread-omni@0.1.2's public eInk device identity.
 EINK_SOURCE_USER_AGENT = "WeRead/2.1.2 WRBrand/Onyx wr_eink Dalvik/2.1.0 (Linux; U; Android 11; BOOX Build/onyx)"
@@ -99,9 +100,23 @@ class WeChatPageBody:
             raise WeReadError("WeChat original request failed", code="SOURCE_NETWORK_ERROR") from exc
         if len(page) > MAX_SOURCE_BYTES:
             raise WeReadError("WeChat original exceeds the body size limit", code="SOURCE_TOO_LARGE")
+        html = page.decode("utf-8", "replace")
+        try:
+            markdown = extract_visible_body(html, title=title, preview=preview)
+        except WeReadError as exc:
+            if exc.code != "SOURCE_CONTENT_INSUFFICIENT":
+                raise
+            gallery = download_picture_post(
+                html, opener=self.opener, user_agent=EINK_SOURCE_USER_AGENT,
+                source_url=url, title=title, account_name=account_name,
+                published_at=published_at, preview=preview or _javascript_content_noencode(html),
+                review_id=review_id,
+            )
+            if gallery is None:
+                raise
+            return gallery
         return {
             "reviewId": review_id, "title": title, "accountName": account_name,
-            "publishedAt": published_at,
-            "markdown": extract_visible_body(page.decode("utf-8", "replace"), title=title, preview=preview),
+            "publishedAt": published_at, "markdown": markdown,
             "contentSource": "微信原文公开页（验证可见正文；非全文一致性保证）",
         }
