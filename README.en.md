@@ -1,6 +1,6 @@
 # wechat-download
 
-An agent skill for downloading WeChat official-account articles. **A public RSS path has been live-tested for catalogued accounts**; an experimental WeRead path targets broader discovery (live QR-login validation pending) to discover article links and retrieve readable content. The legacy WeChat MP article-list endpoint returned `ret=200013, freq control` in the October 2026 live test; an API health check does not establish that batch downloads work.
+An agent skill for downloading WeChat official-account articles. **A public RSS path has been live-tested for catalogued accounts**; an experimental WeRead path targets broader discovery (live QR login validated; full-body retrieval still blocked) to discover article links and retrieve readable content. The legacy WeChat MP article-list endpoint returned `ret=200013, freq control` in the October 2026 live test; an API health check does not establish that batch downloads work.
 
 ## Login-free public RSS (live-tested)
 
@@ -30,7 +30,7 @@ Use the WeRead `MP_WXS_<digits>` account ID returned by search, not a legacy MP 
 
 The adapter invokes the pinned MIT-licensed `weread-omni@0.1.2` and never reads or prints its cookies. The install script stores it in `~/.local/share/wechat-download-skill/weread-omni/`, not the global npm location. Results are one Markdown file per article, with source URL and metadata. Images remain remote URLs, not local image files. Completed files are skipped; failures are written to `failures.json` and return a nonzero exit status. Paging supports up to 1,000 articles per run (default 200), subject to upstream availability and rate limits.
 
-Live test on 2026-10-28: QR login and authentication succeeded, but search (`/store/search`) and article listing (`/mp/chapters`) returned WeRead `-2041`, requiring human verification in the official client. Two known article URLs returned `readable` but only 21 characters of author/navigation chrome (`completeness=unverified`), even with a forced refresh. The adapter now rejects such empty previews instead of reporting a download. The public RSS feed remains the only verified full-body download route for indexed, recent articles. Do not bypass verification; complete it in the official WeRead app if prompted, then retry.
+Live test on 2026-10-28: QR login and authentication succeeded; the phone app showed the newly logged-in BOOX device without a separate verification prompt. Search and listing initially returned `-2041` but both succeeded on a later retry, so an official-client challenge is not established. Full text remains blocked: two known URLs returned `readable` with only 21 characters of navigation chrome (`completeness=unverified`), even after refresh, and an older article returned `SOURCE_CONTENT_INSUFFICIENT`. The adapter rejects empty previews instead of claiming a download. Public RSS previously saved full bodies for indexed recent items, but a later feed request timed out or remained incomplete; availability depends on the third-party source.
 
 WeRead's unpublished article index can be incomplete; deleted, restricted, and paid content may not be readable. The skill does **not** silently subscribe to an account or bypass verification. Subscribe in the WeRead app, or explicitly approve a subscription first. Archive only content you may lawfully access and use.
 
