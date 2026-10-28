@@ -7,6 +7,7 @@ from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from download_weread import collect_articles, download_account, download_url
+from download_rss import RSSError
 from weread_client import WeReadClient, WeReadError, article_url
 
 ACCOUNT = "MP_WXS_1234567890"
@@ -54,6 +55,27 @@ class WeReadTests(unittest.TestCase):
         with self.assertRaisesRegex(WeReadError, "freq control"):
             client.articles(ACCOUNT)
 
+    def test_structured_cli_error_keeps_code_and_account_without_raw_article(self):
+        payload = {"error": "article source content was insufficient", "code": "SOURCE_CONTENT_INSUFFICIENT",
+                   "article": {"accountName": "示例公众号", "sourceUrl": "private-token"}}
+        runner = Mock(return_value=Mock(returncode=1, stdout="", stderr=json.dumps(payload)))
+        client = WeReadClient(executable="/some/cli", runner=runner)
+        with self.assertRaises(WeReadError) as caught:
+            client.read(ARTICLE_URL, refresh=True)
+        self.assertEqual(caught.exception.code, "SOURCE_CONTENT_INSUFFICIENT")
+        self.assertEqual(caught.exception.account_name, "示例公众号")
+        self.assertNotIn("private-token", str(caught.exception))
+        self.assertIn("--refresh", runner.call_args.args[0])
+
+    def test_unreadable_response_preserves_account_for_rss_fallback(self):
+        runner = Mock(return_value=Mock(returncode=0, stdout=json.dumps({
+            "status": "unavailable", "accountName": "示例公众号"}), stderr=""))
+        client = WeReadClient(executable="/some/cli", runner=runner)
+        with self.assertRaises(WeReadError) as caught:
+            client.read(ARTICLE_URL)
+        self.assertEqual(caught.exception.account_name, "示例公众号")
+        self.assertEqual(caught.exception.code, "SOURCE_CONTENT_UNAVAILABLE")
+
     def test_chrome_only_preview_is_not_saved(self):
         preview = {
             "status": "readable", "completeness": "unverified",
@@ -63,9 +85,11 @@ class WeReadTests(unittest.TestCase):
         }
         runner = Mock(return_value=Mock(returncode=0, stdout=json.dumps(preview), stderr=""))
         client = WeReadClient(executable="/some/cli", runner=runner)
+        fallback = Mock()
+        fallback.fetch.side_effect = RSSError("not indexed")
         with tempfile.TemporaryDirectory() as d:
-            with self.assertRaisesRegex(WeReadError, "full body unavailable"):
-                download_url(client, ARTICLE_URL, d)
+            with self.assertRaisesRegex(WeReadError, "RSS fallback unavailable"):
+                download_url(client, ARTICLE_URL, d, rss_fallback=fallback, sleep=lambda _: None)
             self.assertEqual(list(Path(d).glob("*.md")), [])
 
     def test_long_unverified_article_is_saved(self):
@@ -158,6 +182,39 @@ class WeReadTests(unittest.TestCase):
     def test_empty_list_is_an_error(self):
         with self.assertRaisesRegex(WeReadError, "No articles returned"):
             collect_articles(FakeClient(), ACCOUNT, 1, sleep=lambda _: None)
+
+    def test_direct_url_recovers_exact_rss_article_after_three_retries(self):
+        class FailingReader(FakeClient):
+            def __init__(self): super().__init__(); self.read_calls = []
+            def read(self, url, refresh=None):
+                self.read_calls.append(refresh)
+                raise WeReadError("content insufficient", code="SOURCE_CONTENT_INSUFFICIENT", account_name="示例公众号")
+        client = FailingReader()
+        fallback = Mock()
+        fallback.fetch.return_value = {"title": "RSS文章", "accountName": "示例公众号", "publishedAt": "today",
+                                      "markdown": "从RSS读取的正文。" * 80, "contentSource": "公开 RSS（第三方）"}
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(download_url(client, ARTICLE_URL, d, rss_fallback=fallback, sleep=lambda _: None), 0)
+            saved = list(Path(d).glob("*.md"))
+            self.assertEqual(len(saved), 1)
+            self.assertIn("内容渠道：公开 RSS", saved[0].read_text(encoding="utf-8"))
+            self.assertIn("从RSS读取的正文", saved[0].read_text(encoding="utf-8"))
+        self.assertEqual(client.read_calls, [None, True, True, True])
+        fallback.fetch.assert_called_once_with(ARTICLE_URL, "示例公众号")
+
+    def test_batch_uses_same_rss_fallback_after_three_retries(self):
+        class FailingReader(FakeClient):
+            def read(self, url, refresh=None):
+                raise WeReadError("content insufficient", code="SOURCE_CONTENT_INSUFFICIENT", account_name="示例公众号")
+        entry = {"reviewId": "r1", "mpInfo": {"title": "RSS文章", "doc_url": ARTICLE_URL}}
+        client = FailingReader({None: {"articles": [entry]}})
+        fallback = Mock()
+        fallback.fetch.return_value = {"title": "RSS文章", "accountName": "示例公众号",
+                                      "markdown": "从RSS读取的正文。" * 80, "contentSource": "公开 RSS（第三方）"}
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(download_account(client, ACCOUNT, 1, d, rss_fallback=fallback, sleep=lambda _: None), 0)
+            self.assertEqual(len(list(Path(d).glob("*.md"))), 1)
+            self.assertFalse((Path(d) / "failures.json").exists())
 
     def test_known_url_download(self):
         with tempfile.TemporaryDirectory() as d:

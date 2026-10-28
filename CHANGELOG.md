@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Retry transient WeRead article-body failures up to three additional times (2/4/8-second backoff, forced refresh); stop immediately on explicit rate limits or verification challenges.
+- On failure, automatically consult the public RSS catalogue for the verified account and save only an exact matching article with nontrivial `content:encoded`; mark third-party provenance. Accept `--rss-account` when the name is unavailable upstream. Do not substitute other feed items.
+- The latest-three live re-test for 匿名测试公众号 still saved 0/3: two exhausted retries, one challenge stopped early, and this account was absent from the RSS catalogue. A live indexed-feed fallback attempt timed out; controlled exact-item fixtures and 34 unit tests pass.
+
 ## v1.3.0 — 2026-10-28
 
 - Make QR-authenticated WeRead the documented primary route; keep public RSS as a limited fallback and the old MP admin endpoint as compatibility only.

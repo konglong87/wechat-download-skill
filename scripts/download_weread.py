@@ -19,6 +19,8 @@ import subprocess
 import sys
 import time
 
+from article_retrieval import read_article
+from rss_fallback import RSSFallback
 from weread_client import WeReadClient, WeReadError, article_url
 
 PAGE_SIZE = 20
@@ -64,6 +66,7 @@ def _save_article(output_dir, key, title, url, entry, result):
         "> 来源：" + url,
         "> 公众号：" + str(result.get("accountName") or ""),
         "> 发布时间：" + str(result.get("publishedAt") or entry.get("createTime") or ""),
+        *(["> 内容渠道：" + result["contentSource"]] if result.get("contentSource") else []),
         "",
         "---",
         "",
@@ -111,8 +114,10 @@ def collect_articles(client, account_id, count, sleep=time.sleep):
     return list(iter_articles(client, account_id, count, sleep=sleep))
 
 
-def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, sleep=time.sleep):
+def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, sleep=time.sleep,
+                     rss_account=None, rss_fallback=None):
     output_dir = Path(output_dir)
+    fallback = rss_fallback if rss_fallback is not None else RSSFallback()
     success = skipped = processed = 0
     failures = []
     try:
@@ -127,7 +132,7 @@ def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, s
                 url = client.resolve_url(entry)
                 if not url:
                     raise WeReadError("WeRead did not provide a valid original article URL")
-                result = client.read(url)
+                result = read_article(client, url, account_name=rss_account, fallback=fallback, sleep=sleep)
                 path, saved = _save_article(output_dir, key, title, url, entry, result)
                 success += int(saved)
                 skipped += int(not saved)
@@ -156,11 +161,12 @@ def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, s
     return 1 if failures else 0
 
 
-def download_url(client, url, output_dir=DEFAULT_OUTPUT):
+def download_url(client, url, output_dir=DEFAULT_OUTPUT, rss_account=None, rss_fallback=None,
+                 sleep=time.sleep):
     if not article_url(url):
         raise WeReadError("Expected an https://mp.weixin.qq.com/s article URL")
     output_dir = Path(output_dir)
-    result = client.read(url)
+    result = read_article(client, url, account_name=rss_account, fallback=rss_fallback, sleep=sleep)
     path, saved = _save_article(output_dir, url, result.get("title"), url, {}, result)
     print("{}: {} ({} bytes)".format("Downloaded" if saved else "Already exists", path, path.stat().st_size))
     return 0
@@ -182,9 +188,11 @@ def main(argv=None):
     download.add_argument("account_id")
     download.add_argument("count", nargs="?", type=int, default=200)
     download.add_argument("output_dir", nargs="?", type=Path, default=DEFAULT_OUTPUT)
+    download.add_argument("--rss-account", help="exact public-account name if WeRead cannot identify it")
     direct = commands.add_parser("url", help="download a known article URL")
     direct.add_argument("article_url")
     direct.add_argument("output_dir", nargs="?", type=Path, default=DEFAULT_OUTPUT)
+    direct.add_argument("--rss-account", help="exact public-account name if WeRead cannot identify it")
     args = parser.parse_args(argv)
     try:
         client = WeReadClient(refresh=args.refresh)
@@ -197,9 +205,9 @@ def main(argv=None):
         elif args.command == "list":
             result = client.articles(args.account_id, args.count, args.begin or None)
         elif args.command == "download":
-            return download_account(client, args.account_id, args.count, args.output_dir)
+            return download_account(client, args.account_id, args.count, args.output_dir, rss_account=args.rss_account)
         else:
-            return download_url(client, args.article_url, args.output_dir)
+            return download_url(client, args.article_url, args.output_dir, rss_account=args.rss_account)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except WeReadError as exc:

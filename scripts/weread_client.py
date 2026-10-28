@@ -21,6 +21,12 @@ INSTALL_SCRIPT = Path(__file__).with_name("install_weread_cli.sh")
 class WeReadError(RuntimeError):
     """An authentication, transport, or upstream API failure."""
 
+    def __init__(self, message, *, code=None, account_name=None, status=None):
+        super().__init__(message)
+        self.code = code
+        self.account_name = account_name
+        self.status = status
+
 
 def executable_path():
     configured = os.environ.get("WEREAD_CLI")
@@ -76,24 +82,37 @@ class WeReadClient:
         self.refresh = refresh
         self.runner = runner or subprocess.run
 
-    def command(self, *parts):
+    def command(self, *parts, refresh=None):
         base = [self.executable, "--account", self.account, "--json"]
-        if self.refresh:
+        if self.refresh if refresh is None else refresh:
             base.append("--refresh")
         return base + [str(part) for part in parts]
 
-    def call(self, *parts, timeout=90):
+    def call(self, *parts, timeout=90, refresh=None):
         try:
-            completed = self.runner(self.command(*parts), capture_output=True, text=True, timeout=timeout)
+            completed = self.runner(self.command(*parts, refresh=refresh), capture_output=True, text=True, timeout=timeout)
         except subprocess.TimeoutExpired as exc:
             raise WeReadError("WeRead request timed out") from exc
         except OSError as exc:
             raise WeReadError("Cannot start WeRead CLI: {}".format(exc)) from exc
         if completed.returncode != 0:
-            message = completed.stderr.strip().splitlines()
-            # weread-omni redacts secrets before printing structured errors; keep output bounded.
-            detail = message[-1][:500] if message else "unknown error"
-            raise WeReadError("WeRead CLI failed (exit {}): {}".format(completed.returncode, detail))
+            lines = completed.stderr.strip().splitlines()
+            detail = lines[-1][:500] if lines else "unknown error"
+            try:
+                payload = json.loads(lines[-1]) if lines else {}
+            except ValueError:
+                payload = {}
+            payload = payload if isinstance(payload, dict) else {}
+            article = payload.get("article")
+            article = article if isinstance(article, dict) else {}
+            message = payload.get("error")
+            message = message if isinstance(message, str) else detail
+            code = payload.get("code")
+            code = code if isinstance(code, str) else None
+            # Do not log the full upstream article payload or any credentials.
+            label = "{} [{}]".format(message, code) if code else message
+            raise WeReadError("WeRead CLI failed (exit {}): {}".format(completed.returncode, label[:500]),
+                              code=code, account_name=article.get("accountName"), status=payload.get("status"))
         try:
             return json.loads(completed.stdout)
         except (ValueError, TypeError) as exc:
@@ -124,12 +143,15 @@ class WeReadClient:
             return _find_article_url(self.call("review", "single", review_id))
         return None
 
-    def read(self, url):
+    def read(self, url, refresh=None):
         if not article_url(url):
             raise WeReadError("Expected a public https://mp.weixin.qq.com/s article URL")
-        result = self.call("public-accounts", "read-article", url, timeout=150)
-        if not isinstance(result, dict) or result.get("status") != "readable":
-            raise WeReadError("WeRead did not return a readable full article")
+        result = self.call("public-accounts", "read-article", url, timeout=150, refresh=refresh)
+        if not isinstance(result, dict):
+            raise WeReadError("WeRead article response has an unexpected shape")
+        if result.get("status") != "readable":
+            raise WeReadError("WeRead did not return a readable full article",
+                              code="SOURCE_CONTENT_UNAVAILABLE", account_name=result.get("accountName"))
         markdown = result.get("markdown")
         if not isinstance(markdown, str) or not markdown.strip():
             raise WeReadError("WeRead returned no readable article text")
@@ -142,5 +164,6 @@ class WeReadClient:
                 substantive = substantive.replace(label, "")
         if (result.get("completeness") != "verified"
                 and len(re.sub(r"\s+", "", substantive)) < MIN_UNVERIFIED_BODY_CHARACTERS):
-            raise WeReadError("WeRead returned only a short, unverified article preview; full body unavailable")
+            raise WeReadError("WeRead returned only a short, unverified article preview; full body unavailable",
+                              code="SOURCE_CONTENT_INSUFFICIENT", account_name=result.get("accountName"))
         return result

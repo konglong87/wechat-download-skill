@@ -48,6 +48,18 @@ Test 1–5 articles and read the saved files before requesting more. The default
 - Search/listing briefly returned `-2041` during live testing, then recovered without a separate phone verification prompt. Stop on rate limits and try later rather than bypassing challenges.
 - Upstream may mark even a long result `completeness=unverified`. A plausible full body is not a byte-for-byte comparison to the original. Deleted, restricted, paid, or otherwise unavailable content may fail. Archive only content you may access and use.
 
+## Bounded retries and exact-item RSS fallback
+
+- A missing/insufficient body, timeout, or transient service error gets **three retries after the initial request**, with **2/4/8-second backoff** and a forced CLI cache refresh. Explicit verification, rate limits, `-2041`, and blocked pages are **not** hammered; the WeRead request stops immediately and may fall back.
+- After WeRead fails, the adapter uses the verified account name from its response, or an explicit `--rss-account 'Exact account name'`, to look up the public RSS catalogue. It saves a `.md` file only if the feed has the **same article URL identity** (short link or all `__biz`/`mid`/`idx`/`sn` fields) and a nontrivial `content:encoded` body. The Markdown records its third-party RSS provenance. A similar title or a neighboring article is never substituted.
+- Missing catalogue entries, a slow feed, no exact article match, or a short RSS body remain failures with nonzero exit status and `failures.json` for batches. Search/list failures before an article URL is available cannot be matched to an exact RSS item; use the standalone RSS command after confirming the account.
+
+```bash
+python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/ARTICLE' ./wechat_downloads --rss-account 'Exact account name'
+```
+
+A later live run on October 28, 2026 still saved **0/3** latest 匿名测试公众号 articles: posts 1 and 3 exhausted three backoff retries, post 2 was explicitly blocked and was not retried, and the account was not in the public RSS catalogue. A separate real RSS fallback test against an indexed account hit a TLS handshake timeout. The mechanism is implemented and covered by exact-match/retry tests, but availability of the third-party feed is not guaranteed.
+
 ## Scheduled checks: article discovery, not guaranteed full-text delivery
 
 An agent may periodically run `status`, `list ID 0 10`, then `download ID 10 ./wechat_downloads/account` in a **persistent** output directory, reporting newly saved Markdown files, skipped files, failures, and the process exit code. On a nonzero exit, do not report a successful check or “no new articles.” Choose a count large enough to cover new posts since the last run. Scheduling belongs to the user's Codex/Claude/other agent; this project does not install background jobs or retain login secrets.
@@ -56,7 +68,7 @@ An agent may periodically run `status`, `list ID 0 10`, then `download ID 10 ./w
 
 ## Login-free RSS fallback
 
-For a catalogued account with a reachable third-party feed:
+The primary article command tries the fallback automatically when it has an article URL and account name. To query an indexed feed independently, or to work without WeRead login:
 
 ```bash
 python3 scripts/download_rss.py search '小众软件'
