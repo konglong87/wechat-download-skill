@@ -118,6 +118,27 @@ class WeReadTests(unittest.TestCase):
             self.assertEqual(download_account(client, ACCOUNT, 1, Path(d), sleep=lambda _: None), 1)
             self.assertEqual(len(json.loads((Path(d) / "failures.json").read_text())), 1)
 
+    def test_batch_failure_uses_nested_mp_title(self):
+        class FailingReader(FakeClient):
+            def read(self, url):
+                raise WeReadError("article source content was insufficient")
+        entry = {"reviewId": "r1", "mpInfo": {"title": "最新文章", "doc_url": ARTICLE_URL}}
+        client = FailingReader({None: {"articles": [entry]}})
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(download_account(client, ACCOUNT, 1, d, sleep=lambda _: None), 1)
+            failures = json.loads((Path(d) / "failures.json").read_text(encoding="utf-8"))
+            self.assertEqual(failures[0]["title"], "最新文章")
+
+    def test_successful_retry_removes_stale_failure_report(self):
+        entry = {"reviewId": "r1", "mpInfo": {"title": "最新文章", "doc_url": ARTICLE_URL}}
+        client = FakeClient({None: {"articles": [entry]}})
+        with tempfile.TemporaryDirectory() as d:
+            failure_path = Path(d) / "failures.json"
+            failure_path.write_text('[{"error":"old failure"}]', encoding="utf-8")
+            self.assertEqual(download_account(client, ACCOUNT, 1, d, sleep=lambda _: None), 0)
+            self.assertFalse(failure_path.exists())
+            self.assertEqual(len(list(Path(d).glob("*.md"))), 1)
+
     def test_second_page_failure_keeps_first_page_files(self):
         class FailingSecondPage(FakeClient):
             def articles(self, account_id, count, offset):

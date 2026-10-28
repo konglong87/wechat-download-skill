@@ -27,12 +27,18 @@ PAGE_DELAY_SECONDS = 1.0
 ARTICLE_DELAY_SECONDS = 3.2
 DEFAULT_OUTPUT = Path.cwd() / "wechat_downloads"
 FILENAME_CHARACTERS = 55
+FAILURES_FILENAME = "failures.json"
 
 
 def _slug(value):
     text = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "", value or "untitled")
     text = re.sub(r"\s+", "_", text).strip(" ._")
     return (text or "untitled")[:FILENAME_CHARACTERS]
+
+
+def _entry_title(entry, fallback):
+    mp_info = entry.get("mpInfo")
+    return str(entry.get("title") or (mp_info.get("title") if isinstance(mp_info, dict) else None) or fallback)
 
 
 def _existing_article(output_dir, digest):
@@ -112,7 +118,7 @@ def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, s
     try:
         for processed, entry in enumerate(iter_articles(client, account_id, count, sleep=sleep), 1):
             key = entry["reviewId"]
-            title = str(entry.get("title") or key)
+            title = _entry_title(entry, key)
             digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
             if _existing_article(output_dir, digest):
                 skipped += 1
@@ -138,9 +144,12 @@ def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, s
             raise
         failures.append({"accountId": account_id, "error": "Article list: {}".format(exc)})
         print("List stopped after {} items: {}".format(processed, exc), file=sys.stderr)
+    failure_path = output_dir / FAILURES_FILENAME
     if failures:
         output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / "failures.json").write_text(json.dumps(failures, ensure_ascii=False, indent=2), encoding="utf-8")
+        failure_path.write_text(json.dumps(failures, ensure_ascii=False, indent=2), encoding="utf-8")
+    elif failure_path.is_file():
+        failure_path.unlink()  # A successful retry must not leave a stale failure report.
     print("Downloaded: {}  Skipped: {}  Failed: {}  Listed: {}  Output: {}".format(
         success, skipped, len(failures), processed, output_dir
     ))

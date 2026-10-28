@@ -48,6 +48,12 @@ Test 1–5 articles and read the saved files before requesting more. The default
 - Search/listing briefly returned `-2041` during live testing, then recovered without a separate phone verification prompt. Stop on rate limits and try later rather than bypassing challenges.
 - Upstream may mark even a long result `completeness=unverified`. A plausible full body is not a byte-for-byte comparison to the original. Deleted, restricted, paid, or otherwise unavailable content may fail. Archive only content you may access and use.
 
+## Scheduled checks: article discovery, not guaranteed full-text delivery
+
+An agent may periodically run `status`, `list ID 0 10`, then `download ID 10 ./wechat_downloads/account` in a **persistent** output directory, reporting newly saved Markdown files, skipped files, failures, and the process exit code. On a nonzero exit, do not report a successful check or “no new articles.” Choose a count large enough to cover new posts since the last run. Scheduling belongs to the user's Codex/Claude/other agent; this project does not install background jobs or retain login secrets.
+
+**Live test on October 28, 2026: the three newest indexed posts from 匿名测试公众号 were listed, but all three returned `SOURCE_CONTENT_INSUFFICIENT`; `0/3` new bodies were saved. The public RSS catalogue did not include that account.** This path can currently detect new article metadata, but **unattended delivery of the latest full text for that account is not established**. A different known URL from the same account was successfully downloaded; availability varies by article.
+
 ## Login-free RSS fallback
 
 For a catalogued account with a reachable third-party feed:
