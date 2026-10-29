@@ -19,7 +19,7 @@ metadata:
 
 1. 在项目目录检查 Python ≥3.9、Node.js ≥22.13.0、npm；优先使用 `WEREAD_CLI`、PATH 或默认安装路径的 `weread-omni`，缺失则运行 `bash scripts/install_weread_cli.sh`。已登录用户不要重复要求扫码。
 2. 运行 `python3 scripts/download_weread.py status`。未登录才运行 `python3 scripts/download_weread.py login`，把二维码呈现给用户本人扫码确认；可能显示 BOOX 设备。eInk 认证信息属于上游 CLI；不要读取、输出或提交凭证。可选 Web 通道与 eInk 登录态不同，只有用户自行授权并在本机隐藏提示保存 `0600` Cookie 文件后才能启用，绝不在聊天中索取。
-3. **已给文章链接**：运行 `python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/...' ./wechat_downloads`；怀疑缓存时在子命令前加 `--refresh`。核对退出码、文件大小与原文链接；普通文章检查开头／中段／结尾，图片分享检查全部本地图片引用及首／中／末图片能解码。仅有作者、摘要或“阅读原文／不喜欢”且没有原图时不算内容。
+3. **已给文章链接**：若需定位账号且 `search` 返回 `-2041`，先运行 `python3 scripts/download_weread.py identify 'https://mp.weixin.qq.com/s/...' --expect-account '准确名称'`；该步骤只读公开原文页，验证署名与 `biz` 后输出候选 `MP_WXS_<数字>`，不请求微信读书；待冷却结束再单次试 `list ID 0 3`，列表再被验证则停。单篇正文运行 `python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/...' ./wechat_downloads`；怀疑缓存时在子命令前加 `--refresh`。核对退出码、文件大小与原文链接；普通文章检查开头／中段／结尾，图片分享检查全部本地图片引用及首／中／末图片能解码。仅有作者、摘要或“阅读原文／不喜欢”且没有原图时不算内容。
 4. **仅给公众号名称**：先 `search '名称'`，从 `bookInfo.bookId` 确认真实 `MP_WXS_<数字>`（不能使用旧 `fakeid`）；再 `list ID 0 5`、`download ID 1 ./wechat_downloads`，确认真实落盘后才逐步增大数量。默认 200、最多 1,000 篇；这是请求上限，不是历史覆盖承诺。
 5. 若用户已在 `weread.qq.com` 网页登录且愿意尝试实验通道，可指引其在本机执行 `python3 scripts/download_weread.py web-cookie`，从浏览器开发者工具复制该站点 Cookie 值到隐藏终端提示；程序仅向固定微信读书 Web 正文接口请求，失败仍按相同原文 URL 尝试 RSS，不能承诺成功。2026-10-28 无 Web 会话时实测 `errCode=-2010`；本轮最新三篇已由正常正文＋图片分享路线全部归档，不需要假称两篇图片分享有纯文本全文。
 6. 阅读 `.md` 内容，核对 `failures.json`、实际文件数量与错误。若上游未识别公众号名称且用户已明确给出准确名称，可在 `url` 或 `download` 后添加 `--rss-account '名称'` 供自动兜底使用；RSS 必须匹配同一篇文章，不能替换成“相似”文章。以最终退出码和实际 `.md`／本地图片为准：空列表、0 文件、仅摘要且无图、图片缺失或最终失败不可报成功；上游的 `SOURCE_CONTENT_INSUFFICIENT` 也可能由结构化正文或图片画廊备用路线恢复，不能只看中间错误。`-2041` 后运行 `pace-status`：持久熔断至少 30 分钟，到期仅单次低频探测，再失败加倍冷却（最高 24 小时），不得短时反复搜索；已知原文链接在本地熔断时可尝试独立公开原文页与精确 RSS，但不能将中间摘要当成功。不保证手机 App 一定有验证入口。只有用户在官方客户端完成要求的验证后，才运行 `pace-reset --verified` 提前解除。
@@ -34,6 +34,7 @@ bash scripts/install_weread_cli.sh
 python3 scripts/download_weread.py login
 python3 scripts/download_weread.py status
 python3 scripts/download_weread.py pace-status
+python3 scripts/download_weread.py identify 'https://mp.weixin.qq.com/s/TG5KkixnncIrunVZF2ROKQ' --expect-account '孔小黑进城'
 # 仅本人已在 weread.qq.com 网页登录且愿意启用时：
 # python3 scripts/download_weread.py web-cookie
 python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE' ./wechat_downloads

@@ -50,6 +50,18 @@ Test 1–5 articles and read the saved files before requesting more. The default
 - Search/listing briefly returned `-2041` during live testing, then recovered without a separate phone verification prompt. Stop on rate limits and try later rather than bypassing challenges.
 - Upstream may mark even a long result `completeness=unverified`. A plausible full body is not a byte-for-byte comparison to the original. Deleted, restricted, paid, or otherwise unavailable content may fail. Archive only content you may access and use.
 
+## Known link: identify the account without WeRead search
+
+If `search` returns `-2041`, **do not repeat search**. Given a public article URL, `identify` checks the visible publisher name and the page's unique numeric `biz` value without contacting WeRead or solving a challenge:
+
+```bash
+python3 scripts/download_weread.py identify 'https://mp.weixin.qq.com/s/TG5KkixnncIrunVZF2ROKQ' --expect-account '孔小黑进城'
+# Live result: MP_WXS_3227210349. Only after the pacing cooldown expires:
+python3 scripts/download_weread.py list MP_WXS_3227210349 0 3
+```
+
+The ID identifies this **known article's publisher**; it does not prove that the recent-article list is accessible or that indexed search results are current. Redirects, verification shells, publisher mismatches and ambiguous IDs fail closed. A list-level `-2041` remains a stop signal; neither this command nor the public-page body fallback bypasses a CAPTCHA.
+
 ## Adaptive pacing and verification circuit
 
 All authenticated WeRead CLI search/list/read operations share an inter-process lock and a private `~/.local/state/wechat-download-skill/weread-pacing.json` file (timestamps and counters only, mode `0600`; no credentials). Normal requests are staggered by **5–10 seconds**. Explicit rate limits/HTTP 429 trigger exponential **60-second to 30-minute** cooldowns. A `-2041` human-verification challenge has a separate **30-minute to 24-hour** circuit: later processes fail without contacting WeRead until the cooldown expires, when a single low-frequency probe is allowed. Another challenge doubles the cooldown; success clears it. This is not a way around required official-client verification. Remaining cooldowns longer than 15 seconds fail fast rather than tying up a scheduled job; `status`/`login` remain available, but an authenticated `status` does not prove the challenge is resolved.

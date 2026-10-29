@@ -18,6 +18,7 @@ bash scripts/install_weread_cli.sh
 python3 scripts/download_weread.py login   # 用手机微信扫码并确认
 python3 scripts/download_weread.py status  # 检查 auth.status 为 authenticated
 python3 scripts/download_weread.py pace-status  # 检查冷却与验证熔断，不发起搜索
+# python3 scripts/download_weread.py identify 'https://mp.weixin.qq.com/s/...' --expect-account '准确名称'
 ```
 
 安装脚本将固定版本 `weread-omni@0.1.2` 放在 `~/.local/share/wechat-download-skill/weread-omni/`，不修改全局 npm 包。eInk 登录凭证由该 CLI 保存在用户目录，本项目默认不读取 Cookie；仅用户显式启用网页通道时，才读取本人提供的单独 Web Cookie 私有文件，绝不打印或提交；手机微信读书的登录设备页可能显示 **BOOX**。微信读书登录与公众号后台登录互不通用。
@@ -49,6 +50,18 @@ python3 scripts/download_weread.py download MP_WXS_1234567890 5 ./wechat_downloa
 - 普通文章正文缺失，或图片分享缺少任何一张原图且其他路线也无可用内容时返回错误，不生成伪正文／伪图片包；批量下载记录失败项到 `failures.json` 并返回非零退出码。核对成功数、失败数和实际文件，不要把“搜索成功”当成“全文下载成功”。
 - 微信读书接口可能临时返回 `-2041`；本次测试中稍后重试搜索和列表恢复，手机 App **没有**出现单独的验证入口。遇到风控请停止高频请求，之后再试，勿绕过平台验证。现在 CLI 已持久化熔断：`-2041` 后至少 30 分钟不再向微信读书请求，到期才允许单次探测；再次失败会加倍冷却。
 - 上游可能标记 `completeness=unverified`。即使正文看起来完整，也无法保证与微信原文逐字一致；已删、受限、付费文章及部分公开文章可能无法读取。只归档自己有权访问和使用的内容。
+
+## 已知链接：不依赖微信读书搜索定位账号
+
+当 `search` 返回 `-2041`，**不要重复搜索**。如果你已经拥有该公众号的一篇公开原文链接，可以直接从原文页的可见账号署名和 `biz` 标识识别账号，避免搜索接口；这不请求微信读书，也不处理验证码：
+
+```bash
+python3 scripts/download_weread.py identify 'https://mp.weixin.qq.com/s/TG5KkixnncIrunVZF2ROKQ' --expect-account '孔小黑进城'
+# 实测返回 MP_WXS_3227210349；等 pace-status 冷却结束后，再低频尝试：
+python3 scripts/download_weread.py list MP_WXS_3227210349 0 3
+```
+
+`identify` 仅证明**这篇原文**的账号身份，不能证明微信读书列表可用、更不能把搜狗旧文视为最新三篇。无法访问原文、验证跳转、账号名不符、`biz` 不唯一时会失败，不能猜 ID。已经给定原文链接时仍可用 `url` 下载公开正文；列表接口若也返回 `-2041`，停止请求并等待官方验证或下一次冷却探测，不绕过验证码。
 
 ## 自适应节流与验证熔断
 

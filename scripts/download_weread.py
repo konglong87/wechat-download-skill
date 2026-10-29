@@ -25,6 +25,7 @@ from weread_client import WeReadClient, WeReadError, article_url
 from weread_pacing import WeReadPacer
 from weread_web_body import DEFAULT_COOKIE_FILE, WeReadWebBody, store_cookie
 from wechat_page_body import WeChatPageBody
+from wechat_account_identity import identify_url
 
 PAGE_SIZE = 20
 MAX_ARTICLES = 1000
@@ -229,6 +230,9 @@ def main(argv=None):
     commands.add_parser("login", help="scan a WeRead QR code (separate from MP login)")
     commands.add_parser("status", help="verify WeRead authentication")
     commands.add_parser("pace-status", help="show local pacing and verification circuit state")
+    identify = commands.add_parser("identify", help="derive an account ID from a public article without WeRead search")
+    identify.add_argument("article_url")
+    identify.add_argument("--expect-account", help="exact account name to verify against the public page")
     reset = commands.add_parser("pace-reset", help="resume only after official-client human verification")
     reset.add_argument("--verified", action="store_true", help="confirm official verification was completed")
     commands.add_parser("web-cookie", help="privately save a Cookie from your own WeRead Web login")
@@ -255,6 +259,10 @@ def main(argv=None):
             return 0
         if args.command == "pace-status":
             print(json.dumps(WeReadPacer().status(), ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "identify":
+            print(json.dumps(identify_url(args.article_url, expected_name=args.expect_account),
+                             ensure_ascii=False, indent=2))
             return 0
         if args.command == "pace-reset":
             if not args.verified:
