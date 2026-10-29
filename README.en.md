@@ -60,7 +60,7 @@ python3 scripts/download_weread.py identify 'https://mp.weixin.qq.com/s/TG5Kkixn
 python3 scripts/download_weread.py list MP_WXS_3227210349 0 3
 ```
 
-The ID identifies this **known article's publisher**; it does not prove that the recent-article list is accessible or that indexed search results are current. Redirects, verification shells, publisher mismatches and ambiguous IDs fail closed. A list-level `-2041` remains a stop signal; neither this command nor the public-page body fallback bypasses a CAPTCHA.
+The ID identifies this **known article's publisher**; it does not prove that the recent-article list is accessible or that indexed search results are current. Redirects, verification shells, publisher mismatches and ambiguous IDs fail closed. A list-level `-2041` remains a stop signal; neither this command nor the public-page body fallback bypasses a CAPTCHA. **Observed October 29, 2026:** the known 孔小黑进城 article archived from its public page (7,523-byte Markdown), but the one `/mp/chapters` attempt after cooldown also returned `-2041`; no newest-three list or 3/3 download is claimed. The unauthenticated public profile showed a verification page, and this account was absent from the public RSS catalogue. Upstream distinguishes `-2041` (human verification) from `-2014` (throttling); pacing and re-login do not guarantee recovery. Without a usable official-client verification flow or an independent current index, ask the user for the newest article URLs and archive them individually.
 
 ## Adaptive pacing and verification circuit
 
