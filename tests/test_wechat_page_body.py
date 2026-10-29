@@ -83,7 +83,7 @@ class PublicPageTests(unittest.TestCase):
         opener = Mock()
         opener.open.return_value = FakeResponse(page.encode("utf-8"))
         client = WeChatPageBody(opener=opener)
-        result = client.read(ARTICLE_URL, title=TITLE, account_name="匿名测试公众号",
+        result = client.read(ARTICLE_URL, title=TITLE, account_name="测试公众号",
                              review_id="MP_WXS_1234567890_abc")
         self.assertGreater(len(result["markdown"]), 500)
         self.assertEqual(result["reviewId"], "MP_WXS_1234567890_abc")

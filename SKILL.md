@@ -19,7 +19,7 @@ Users state goals in natural language, for example “download the latest three 
 
 The internal public archiver is `scripts/download_public.py`; it needs Python ≥3.9, does not use WeRead login or cookies, skips complete duplicates, paces batches, and stops on challenges, redirects, mismatched accounts, 403/429, or insufficient content. Image posts are archived as images plus metadata; OCR is separate.
 
-2026-10-29 对第三方号「匿名测试公众号」的已知文章 `https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE` 已用独立公开原文入口保存 44,395 字节 Markdown；只证明**有链接时单篇可下载**，不证明仅凭账号名自动发现最新三篇。
+2026-10-29 对本人管理的「孔小黑进城」已知文章 `https://mp.weixin.qq.com/s/TG5KkixnncIrunVZF2ROKQ` 已用独立公开原文入口保存 7,539 字节 Markdown；只证明**有链接时单篇可下载**，不证明仅凭账号名自动发现最新三篇。
 
 ## 可选旧路线及边界
 
@@ -29,8 +29,8 @@ The internal public archiver is `scripts/download_public.py`; it needs Python �
 - 尊重版权、访问权限和平台验证；不绕过验证码、风控、付费墙，不索取 Cookie 或后台 token。输出目录保留归档，临时研究文件和截图验收后清理。
 
 ```bash
-python3 scripts/download_public.py url 'https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE' ./wechat_downloads/匿名测试公众号 --account '匿名测试公众号'
-python3 scripts/download_public.py batch links.txt ./wechat_downloads/匿名测试公众号 --account '匿名测试公众号'
+python3 scripts/download_public.py url 'https://mp.weixin.qq.com/s/TG5KkixnncIrunVZF2ROKQ' ./wechat_downloads/孔小黑进城 --account '孔小黑进城'
+python3 scripts/download_public.py batch links.txt ./wechat_downloads/孔小黑进城 --account '孔小黑进城'
 python3 scripts/download_rss.py search '小众软件'
 python3 -m unittest discover -s tests -v
 ```
