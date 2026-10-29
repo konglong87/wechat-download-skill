@@ -60,7 +60,7 @@ python3 scripts/download_weread.py pace-status
 python3 scripts/download_weread.py pace-reset --verified
 ```
 
-Never run `pace-reset` automatically in a scheduler. Treat an active circuit as a failed check and wait for a later run. An exact public RSS fallback may still work for a known URL when the WeRead path is unavailable, but catalogue coverage is limited.
+Never run `pace-reset` automatically in a scheduler. Treat an active circuit as a failed check and wait for a later run. For a known URL blocked locally by the WeRead circuit, the independent public original-page reader may still work; then exact-item public RSS is attempted. A blocked page or missing feed remains a failure.
 
 ## Bounded retries, normal articles, image posts, and exact-item RSS
 

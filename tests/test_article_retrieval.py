@@ -113,6 +113,23 @@ class RetrievalTests(unittest.TestCase):
         web.read.assert_called_once()
         rss.fetch.assert_not_called()
 
+    def test_local_pacing_gate_uses_public_page_without_a_weread_retry(self):
+        for code, message in (("HUMAN_VERIFICATION_REQUIRED", "Previous WeRead -2041; no request sent"),
+                              ("PACING_COOLDOWN", "WeRead rate limit cooldown; no request sent")):
+            with self.subTest(code=code):
+                client, source, rss, web = Mock(), Mock(), Mock(), Mock()
+                client.read.side_effect = WeReadError(message, code=code)
+                source.read.return_value = {"markdown": "公开页真实正文" * 100,
+                                            "contentSource": "微信原文公开页"}
+                result = read_article(client, URL, account_name="目标号", fallback=rss,
+                                      source_client=source, web_client=web,
+                                      sleep=lambda _: self.fail("must not retry WeRead"))
+                self.assertIn("真实正文", result["markdown"])
+                client.read.assert_called_once_with(URL)
+                source.read.assert_called_once()
+                rss.fetch.assert_not_called()
+                web.read.assert_not_called()
+
     def test_rate_limit_does_not_switch_to_web(self):
         client, web, rss, source = Mock(), Mock(), Mock(), Mock()
         client.read.side_effect = WeReadError("freq control -2041", review_id="MP_WXS_1234567890_abc")

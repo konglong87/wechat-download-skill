@@ -60,7 +60,7 @@ python3 scripts/download_weread.py pace-status
 python3 scripts/download_weread.py pace-reset --verified
 ```
 
-不建议定时任务无条件执行 `pace-reset`；应将熔断/冷却视为一次失败，等待下一次计划运行。已知原文链接可在主路被熔断时尝试精确匹配公开 RSS，但 RSS 未收录则仍应报告失败。
+不建议定时任务无条件执行 `pace-reset`；应将熔断/冷却视为一次失败，等待下一次计划运行。已知原文链接在主路被本地熔断时会尝试独立的公开原文页，再按同一链接精确匹配公开 RSS；页面被拦或 RSS 未收录仍应报告失败。
 
 ## 自动重试、普通正文、图片分享与 RSS 兜底
 
