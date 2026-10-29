@@ -44,5 +44,3 @@ class PageIdentity(HTMLParser):
             if value:
                 self.fields[self.active] = value
             self.active = self.active_tag = None
-
-

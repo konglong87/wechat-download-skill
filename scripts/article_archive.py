@@ -112,5 +112,3 @@ def _save_article(output_dir, key, title, url, entry, result):
             raise
         raise WeReadError("Could not save article and all original images") from exc
     return path, True
-
-
