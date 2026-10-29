@@ -1,6 +1,7 @@
 ## Unreleased — 2026-10-29
 
 - Change the recommended route to **explicit public article URL → independent direct-page downloader → shared atomic Markdown/image archive**. Add `scripts/download_public.py url|batch`, strict account-name validation, manifest deduplication, paced batch downloads, and challenge/access-refusal stop conditions; no WeRead search, login, or Cookie is used.
+- Rewrite README, English README, and SKILL as **Agent-first** documentation: natural-language requests are the user interface; shell commands are internal Agent implementation details. Document the discovery ladder, human-interaction boundaries, and the fact that account-name-only newest-post discovery is not guaranteed.
 - Extract shared archive and public-page identity components from the legacy WeRead CLI, preserving its test behavior. Add route-specific tests.
 - Live-check an explicitly supplied 匿名测试公众号 article: `EXAMPLE_ARTICLE` saved as a 44,395-byte Markdown file on 2026-10-29. This does **not** prove fully automated discovery of an account's newest three posts; title-only/VIP indexes and stale third-party caches are not substituted for original links.
 

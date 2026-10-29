@@ -4,17 +4,45 @@
 
 > **Live check, 2026-10-29:** An explicitly supplied third-party `匿名测试公众号` article URL produced a **44,395-byte** Markdown file with title, account, date, and body using the standalone public-page CLI. This proves a *known URL* can work, **not** that the three newest posts can be discovered automatically from an account name. Public RSS covers only indexed accounts; title-only/VIP directories are not original-URL sources.
 
-## New route: batch known public links
+## How other Agents use this Skill (natural language first)
 
-Requires Python **3.9+** only; no Node/npm, QR login, admin account, or cookies:
+This repository is an Agent Skill for Codex, Claude, and similar agents. End users are not expected to open a terminal or run Python commands. A user can simply say:
 
-```bash
-python3 scripts/download_public.py url 'https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE' ./wechat_downloads/匿名测试公众号 --account '匿名测试公众号'
-# Put one legitimately obtained, original article URL on each line in links.txt:
-python3 scripts/download_public.py batch links.txt ./wechat_downloads/匿名测试公众号 --account '匿名测试公众号'
+> Download the latest three posts from “孔小黑进城” and save them to the article archive.
+
+The Agent should identify the account and count, try lawful discovery sources, obtain real `https://mp.weixin.qq.com/s/...` URLs, archive each article, verify the body or image gallery, skip complete duplicates, and report successes, skips, failures, and reasons. The command line is an internal implementation detail, not a user-facing requirement.
+
+The user only needs to help when a platform requires human interaction, such as scanning a QR code, approving an authorization dialog, or normally sharing an article link from the mobile WeChat app.
+
+### Preferred route: archive known public article URLs
+
+When the Agent has one or more legitimately obtained original article URLs, it can save normal posts as Markdown and image posts with local image files. The internal entry point is `scripts/download_public.py`; users do not need to invoke it directly.
+
+It supports normal articles, image posts, exact account-name checks, duplicate skipping, paced batches, and fail-closed handling for challenge pages, redirects, account mismatches, HTTP 403/429, or teaser-only content.
+
+### Agent discovery when only an account name is provided
+
+The Agent may try these lawful sources:
+
+```text
+account name
+  ├─ indexed public RSS
+  ├─ a known article URL supplied by the user
+  ├─ the user's authorized official-account dashboard
+  ├─ WeRead indexing (optional; may be blocked by -2041)
+  └─ a normal share link from the user's mobile WeChat app
 ```
 
-The exact visible account name is verified when `--account` is supplied; the page must identify an account even without it. Complete existing archives are skipped, requests are spaced, and challenges, redirects, and access refusals stop the batch with nonzero status. Review actual files and every local image. If no public source yields original links, a user must share them normally from mobile WeChat; unattended account-to-latest discovery is **not yet verified**. The open-source [Wechat2RssScript](https://github.com/zjuerkzhang/Wechat2RssScript) demonstrates an Android-side link-to-RSS idea, but documents testing only on WeChat 8.0.34; this project has not validated it on a current phone. Respect copyright and platform verification; do not bypass challenges or paywalls.
+This is not a guarantee that an account name alone will always yield the latest posts. Title-only indexes, ReadGZH's cache, and public RSS feeds are incomplete sources. If no real article URL can be verified, the Agent should report that discovery is incomplete and ask for a normal shared link—not ask the user to run terminal commands or invent a URL.
+
+### Live-verified boundaries
+
+- `匿名测试公众号`: a known original URL was archived as a 44,395-byte Markdown file; normal and image-post archives also exist locally.
+- `孔小黑进城`: a known original URL was archived as a 7,539-byte normal article; three posts were previously obtained through the owner's dashboard, but third-party latest-post discovery is not yet stable.
+- Android automatic link extraction and phone-to-computer synchronization have not been validated on the current device; do not promise unattended operation.
+- Image text is not OCRed automatically; add OCR separately and review it.
+
+Respect copyright, access permissions, and platform verification. Never bypass challenges, rate limits, or paywalls.
 
 ## Legacy route: WeRead (optional, not recommended)
 

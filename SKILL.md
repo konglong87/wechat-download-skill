@@ -1,17 +1,23 @@
 ---
 name: wechat-download
-description: Archive legitimately obtained public WeChat article URLs as verified Markdown and local image galleries without WeRead; discover links only through lawful public feeds or user sharing.
+description: Agent-first workflow for discovering lawful WeChat article URLs and archiving verified Markdown and local image galleries; users state goals in natural language and do not run project commands.
 metadata:
   version: "1.4.0-dev"
 ---
 
 # 微信公众号文章归档
 
-## 当前首选路线
+## Agent-first workflow
 
-1. **输入是原文链接**：用户从公众号文章的正常分享操作或已验证的公开 Feed 得到 `https://mp.weixin.qq.com/s/...`。执行 `python3 scripts/download_public.py url '原文链接' ./wechat_downloads/账号 --account '准确名称'`。批量时在 UTF-8 文本中每行放一条链接，运行 `python3 scripts/download_public.py batch links.txt ./wechat_downloads/账号 --account '准确名称'`。仅需 Python ≥3.9，不调用微信读书、不读登录态或 Cookie。
-2. **只给账号名**：先检查 `download_rss.py search '准确名称'` 的公开目录（只覆盖收录账号），或用户可正常分享的原文链接。第三方标题目录及 ReadGZH 缓存可能不全或不含原文 URL；不得把标题、摘要、旧文当作最新文章。若没有可验证的最近原文 URL，明确报告自动发现未完成，向用户索取正常分享链接；不要臆造链接。
-3. **验收**：检查命令退出码、文件来源/账号/发布时间、普通正文开头/中段/结尾、图片分享本地全部原图。验证页、账号不符、仅摘要、图片缺失都不是成功。批量已完整存档的 URL 自动跳过；遇验证或访问拒绝即停，不自动重试。用户未指定周期时不配置定时任务；要承诺无人值守，必须先实测指定账号最近若干篇的发现与落盘端到端。
+Users state goals in natural language, for example “download the latest three posts from 孔小黑进城”. The Agent—not the user—runs the project commands and chooses the route.
+
+1. Parse the account, count, output location, and any supplied article URLs.
+2. Try lawful discovery adapters in order: indexed public RSS, supplied URLs, an authorized owner dashboard, optional WeRead indexing, and normal mobile-WeChat share links.
+3. When a real `https://mp.weixin.qq.com/s/...` URL is available, invoke the public-page archiver internally. Verify account identity, body/gallery completeness, local files, and exit status.
+4. Report downloaded, skipped, and failed items with reasons. If discovery is incomplete, ask only for the missing human action or a normally shared link; never ask the user to run terminal commands.
+5. Do not promise latest-post discovery from an account name alone unless the exact discovery source and end-to-end download have been verified for that account.
+
+The internal public archiver is `scripts/download_public.py`; it needs Python ≥3.9, does not use WeRead login or cookies, skips complete duplicates, paces batches, and stops on challenges, redirects, mismatched accounts, 403/429, or insufficient content. Image posts are archived as images plus metadata; OCR is separate.
 
 2026-10-29 对第三方号「匿名测试公众号」的已知文章 `https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE` 已用独立公开原文入口保存 44,395 字节 Markdown；只证明**有链接时单篇可下载**，不证明仅凭账号名自动发现最新三篇。
 
