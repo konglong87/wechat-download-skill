@@ -1,13 +1,24 @@
 # wechat-download-skill
 
-An agent skill and CLI for discovering WeChat official accounts through a **QR-authenticated WeRead account** and saving normal article text as Markdown or image-post galleries as Markdown plus local original images. Known article URLs can be downloaded directly. Owners of an official account can also discover their own recent published URLs in the official MP dashboard and download them individually. An optional WeRead Web body route and public RSS are independent fallbacks; the legacy MP admin API remains compatibility-only.
+**Recommended route: archive known public WeChat article URLs directly, without WeRead authentication or eInk search.** Save verified visible article bodies as Markdown, and image posts with their local original images. A URL list supports one-by-one batch archiving; challenge pages, mismatched accounts, and teaser-only pages fail closed. Older WeRead, owner-dashboard, and public RSS paths remain optional, **not the default**.
 
-> **Latest-three real download (October 28, 2026):** All three newest 匿名测试公众号 posts were archived: the Ontology post is a normal **42,669-byte Markdown / 17,671-character body**; posts 1 and 3 are WeChat `item_show_type=8` image posts, archived with their captions and **7 + 8 original images**. Result: **3/3 post packages, 15/15 locally saved images**, with a successful batch recheck. Text inside images has **not** been OCRed; this is not three plain-text full articles.
+> **Live check, 2026-10-29:** An explicitly supplied third-party `匿名测试公众号` article URL produced a **44,395-byte** Markdown file with title, account, date, and body using the standalone public-page CLI. This proves a *known URL* can work, **not** that the three newest posts can be discovered automatically from an account name. Public RSS covers only indexed accounts; title-only/VIP directories are not original-URL sources.
 
+## New route: batch known public links
 
-[中文说明](README.md)
+Requires Python **3.9+** only; no Node/npm, QR login, admin account, or cookies:
 
-## Install and sign in
+```bash
+python3 scripts/download_public.py url 'https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE' ./wechat_downloads/匿名测试公众号 --account '匿名测试公众号'
+# Put one legitimately obtained, original article URL on each line in links.txt:
+python3 scripts/download_public.py batch links.txt ./wechat_downloads/匿名测试公众号 --account '匿名测试公众号'
+```
+
+The exact visible account name is verified when `--account` is supplied; the page must identify an account even without it. Complete existing archives are skipped, requests are spaced, and challenges, redirects, and access refusals stop the batch with nonzero status. Review actual files and every local image. If no public source yields original links, a user must share them normally from mobile WeChat; unattended account-to-latest discovery is **not yet verified**. The open-source [Wechat2RssScript](https://github.com/zjuerkzhang/Wechat2RssScript) demonstrates an Android-side link-to-RSS idea, but documents testing only on WeChat 8.0.34; this project has not validated it on a current phone. Respect copyright and platform verification; do not bypass challenges or paywalls.
+
+## Legacy route: WeRead (optional, not recommended)
+
+### Install and sign in
 
 On macOS or Linux, install Python **≥3.9**, Node.js **≥22.13.0**, and npm. You do not need WeChat MP administrator access; scan the QR code with a WeChat account that has WeRead.
 
@@ -86,7 +97,7 @@ Never run `pace-reset` automatically in a scheduler. Treat an active circuit as 
 
 A user may personally open a public-account article in the **official WeRead website** and complete any CAPTCHA displayed. [Community reports](https://github.com/finlater/weread.koplugin/issues/62) conflict about whether this restores a separate eInk session. In this test, the phone app's Settings → Privacy had **no** “reauthorize public accounts” option; do not keep directing users there. Clearing logged-in devices and scanning in again is a **last resort** that logs devices out and is not guaranteed to work. Never share cookies or verification codes with an agent. Only after actual official WeRead verification should the user consider `pace-reset --verified` and one diagnostic probe. Otherwise use known public article URLs individually; for an account the user manages, its own MP dashboard can supply the newest URLs while WeRead discovery remains blocked.
 
-## Bounded retries, normal articles, image posts, and exact-item RSS
+## Legacy route: bounded retries and exact-item RSS
 
 - A missing/insufficient body, timeout, or transient service error gets **up to three retries after the initial request**, with **10/30/90-second backoff** and a forced CLI cache refresh. Explicit verification, rate limits, `-2041`, and blocked pages are **not** hammered. The previous `HEAD` redirect guard was removed: even an article that succeeds with a fresh WeRead CLI request returned a challenge to independent `HEAD`, so HEAD alone is not proof that a GET body is unavailable.
 - After the eInk source fails, the adapter makes one bounded, no-redirect request to the public article URL with the pinned eInk user agent. It accepts a substantive visible `#js_content` or long `content_noencode` for normal articles. For `item_show_type=8` image posts, it archives the complete `picture_page_info_list` gallery plus the caption; teasers alone never count as success. An explicitly configured Web session then gets one try before RSS. Finally the adapter uses the verified account name from its response, or an explicit `--rss-account 'Exact account name'`, to look up the public RSS catalogue. It saves a `.md` file only if the feed has the **same article URL identity** (short link or all `__biz`/`mid`/`idx`/`sn` fields) and a nontrivial `content:encoded` body. The Markdown records its third-party RSS provenance. A similar title or a neighboring article is never substituted.
@@ -114,7 +125,7 @@ python3 scripts/download_weread.py --refresh download MP_WXS_1234567890 3 ./wech
 
 Re-sign in and re-run `web-cookie` if the session expires; to disable the route, move the private file elsewhere yourself. Never bypass verification, rate limits, or paid access. Verify the three actual `.md` files before scheduling unattended downloads.
 
-## Scheduled checks: verify text and local image galleries
+## Scheduled checks: validate link discovery first
 
 An agent may periodically run `status`, `list ID 0 10`, then `download ID 10 ./wechat_downloads/account` in a **persistent** output directory, reporting newly saved Markdown files, skipped files, failures, and the process exit code. On a nonzero exit, do not report a successful check or “no new articles.” Choose a count large enough to cover new posts since the last run. Scheduling belongs to the user's Codex/Claude/other agent; this project does not install background jobs and saves a separate Web session secret only if the user explicitly invokes `web-cookie`.
 

@@ -1,3 +1,9 @@
+## Unreleased — 2026-10-29
+
+- Change the recommended route to **explicit public article URL → independent direct-page downloader → shared atomic Markdown/image archive**. Add `scripts/download_public.py url|batch`, strict account-name validation, manifest deduplication, paced batch downloads, and challenge/access-refusal stop conditions; no WeRead search, login, or Cookie is used.
+- Extract shared archive and public-page identity components from the legacy WeRead CLI, preserving its test behavior. Add route-specific tests.
+- Live-check an explicitly supplied 匿名测试公众号 article: `EXAMPLE_ARTICLE` saved as a 44,395-byte Markdown file on 2026-10-29. This does **not** prove fully automated discovery of an account's newest three posts; title-only/VIP indexes and stale third-party caches are not substituted for original links.
+
 # Changelog
 
 ## Unreleased

@@ -16,12 +16,14 @@ import urllib.parse
 import urllib.request
 
 from download_rss import article_text
+from public_page_identity import PageIdentity
 from weread_client import WeReadError, article_url
 from weread_web_body import ContentFragment
 from wechat_picture_body import download_picture_post
 
 # Keep aligned with weread-omni@0.1.2's public eInk device identity.
 EINK_SOURCE_USER_AGENT = "WeRead/2.1.2 WRBrand/Onyx wr_eink Dalvik/2.1.0 (Linux; U; Android 11; BOOX Build/onyx)"
+PUBLIC_BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 MAX_SOURCE_BYTES = 10 * 1024 * 1024
 SOURCE_TIMEOUT_SECONDS = 20
 MIN_FULL_BODY_CHARACTERS = 500
@@ -116,15 +118,17 @@ def extract_visible_body(page, *, title=None, preview=None):
 
 
 class WeChatPageBody:
-    def __init__(self, opener=None):
+    def __init__(self, opener=None, *, user_agent=EINK_SOURCE_USER_AGENT, verify_account=False):
         self.opener = opener or urllib.request.build_opener(NoRedirect)
+        self.user_agent = user_agent
+        self.verify_account = verify_account
 
     def read(self, url, *, title=None, account_name=None, published_at=None, preview=None, review_id=None):
         if not article_url(url):
             raise WeReadError("Expected an HTTPS WeChat article URL", code="SOURCE_URL_INVALID")
         request = urllib.request.Request(url, headers={
             "Accept": "text/html,application/xhtml+xml",
-            "User-Agent": EINK_SOURCE_USER_AGENT,
+            "User-Agent": self.user_agent,
         })
         try:
             with self.opener.open(request, timeout=SOURCE_TIMEOUT_SECONDS) as response:
@@ -138,6 +142,15 @@ class WeChatPageBody:
         if len(page) > MAX_SOURCE_BYTES:
             raise WeReadError("WeChat original exceeds the body size limit", code="SOURCE_TOO_LARGE")
         html = page.decode("utf-8", "replace")
+        if self.verify_account:
+            identity = PageIdentity()
+            identity.feed(html)
+            actual_account = identity.fields.get("js_name")
+            if not actual_account:
+                raise WeReadError("Public article has no verifiable account name", code="ACCOUNT_IDENTITY_MISSING")
+            if account_name and actual_account != account_name:
+                raise WeReadError("Public article account does not match the expected account", code="ACCOUNT_IDENTITY_MISMATCH")
+            account_name = actual_account
         page_title, page_published_at = extract_public_metadata(html)
         if title and page_title and re.sub(r"\s+", "", title) != re.sub(r"\s+", "", page_title):
             raise WeReadError("Original page title does not match the requested article", code="SOURCE_IDENTITY_MISMATCH")
@@ -149,7 +162,7 @@ class WeChatPageBody:
             if exc.code != "SOURCE_CONTENT_INSUFFICIENT":
                 raise
             gallery = download_picture_post(
-                html, opener=self.opener, user_agent=EINK_SOURCE_USER_AGENT,
+                html, opener=self.opener, user_agent=self.user_agent,
                 source_url=url, title=title, account_name=account_name,
                 published_at=published_at, preview=preview or _javascript_content_noencode(html),
                 review_id=review_id,
