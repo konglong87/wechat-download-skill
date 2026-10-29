@@ -22,6 +22,7 @@ import time
 from article_retrieval import read_article
 from rss_fallback import RSSFallback
 from weread_client import WeReadClient, WeReadError, article_url
+from weread_pacing import WeReadPacer
 from weread_web_body import DEFAULT_COOKIE_FILE, WeReadWebBody, store_cookie
 from wechat_page_body import WeChatPageBody
 
@@ -227,6 +228,9 @@ def main(argv=None):
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("login", help="scan a WeRead QR code (separate from MP login)")
     commands.add_parser("status", help="verify WeRead authentication")
+    commands.add_parser("pace-status", help="show local pacing and verification circuit state")
+    reset = commands.add_parser("pace-reset", help="resume only after official-client human verification")
+    reset.add_argument("--verified", action="store_true", help="confirm official verification was completed")
     commands.add_parser("web-cookie", help="privately save a Cookie from your own WeRead Web login")
     search = commands.add_parser("search", help="search public accounts")
     search.add_argument("query")
@@ -248,6 +252,15 @@ def main(argv=None):
         if args.command == "web-cookie":
             store_cookie(args.web_cookie_file or DEFAULT_COOKIE_FILE)
             print("WeRead Web Cookie saved privately; it is not a guarantee of article access")
+            return 0
+        if args.command == "pace-status":
+            print(json.dumps(WeReadPacer().status(), ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "pace-reset":
+            if not args.verified:
+                raise WeReadError("Complete official-client verification, then use pace-reset --verified")
+            WeReadPacer().clear_verified_challenge()
+            print("WeRead verification circuit reset; requests remain paced")
             return 0
         client = WeReadClient(refresh=args.refresh)
         web_client = WeReadWebBody(args.web_cookie_file) if args.web_cookie_file else None

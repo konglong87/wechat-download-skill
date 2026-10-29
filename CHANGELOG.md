@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a cross-process, persisted WeRead request pacer: randomized 5–10-second spacing, exponential 60-second–30-minute rate-limit cooldown and separate `-2041` verification circuit with single probe after 30-minute–24-hour backoff. Expose `pace-status` and explicit `pace-reset --verified`; lengthen transient article-body retries to 10/30/90 seconds. Never store authentication in pacing state or hammer a challenge. Live target-account download still requires an actual account identity and an accessible list; no success claim from the local smoke test.
+
 - Add strict `item_show_type=8` image-post support: parse the actual `picture_page_info_list`, download every HTTPS original image from the allowlisted CDN, verify image magic and bounds, save atomic Markdown plus local `_images/` assets, and treat missing files as incomplete. Latest-three 匿名测试公众号 now archive **3/3**: one normal text article and two image galleries (7 + 8 images; 15/15 decoded and dimension-checked). No OCR claim. A repeat batch returned `Skipped: 3, Failed: 0` and cleared `failures.json`.
 
 - Re-test three newest 匿名测试公众号 posts individually. Fix an upstream false positive: the Ontology article contains the phrase “需要验证” in its genuine body, but weread-omni scans the entire HTML and rejects it. A strict normal-page body adapter now saves this article (42,669-byte Markdown, 17,671 body characters); the other two expose only 326/447-character previews and remain failures. At that intermediate stage the outcome was **1/3**; subsequent image-gallery support archived the remaining two media posts.

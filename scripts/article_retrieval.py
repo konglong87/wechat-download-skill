@@ -8,7 +8,7 @@ from rss_fallback import RSSFallback
 from weread_client import WeReadError
 
 MAX_READ_RETRIES = 3  # Three retries after the initial request.
-RETRY_BACKOFF_SECONDS = (2, 4, 8)
+RETRY_BACKOFF_SECONDS = (10, 30, 90)
 TRANSIENT_SOURCE_CODES = frozenset(("SOURCE_CONTENT_INSUFFICIENT",))
 TRANSIENT_HTTP_STATUS = frozenset((500, 502, 503, 504))
 STOP_WORDS = ("freq control", "rate limit", "-2041", "验证", "captcha", "challenge",

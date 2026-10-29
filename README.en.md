@@ -17,6 +17,7 @@ cd wechat-download-skill
 bash scripts/install_weread_cli.sh
 python3 scripts/download_weread.py login   # scan and confirm on your phone
 python3 scripts/download_weread.py status  # auth.status should be authenticated
+python3 scripts/download_weread.py pace-status  # local pacing state; no search request
 ```
 
 The installer pins `weread-omni@0.1.2` under `~/.local/share/wechat-download-skill/weread-omni/`, without changing global npm packages. The upstream CLI owns the eInk session in your home directory. This skill does not read cookies by default; only an explicitly enabled Web route reads an owner-only Cookie file, and never prints or commits it. The phone's WeRead device list may show the new login as **BOOX**. WeRead authentication is separate from the WeChat MP admin session.
@@ -49,9 +50,21 @@ Test 1–5 articles and read the saved files before requesting more. The default
 - Search/listing briefly returned `-2041` during live testing, then recovered without a separate phone verification prompt. Stop on rate limits and try later rather than bypassing challenges.
 - Upstream may mark even a long result `completeness=unverified`. A plausible full body is not a byte-for-byte comparison to the original. Deleted, restricted, paid, or otherwise unavailable content may fail. Archive only content you may access and use.
 
+## Adaptive pacing and verification circuit
+
+All authenticated WeRead CLI search/list/read operations share an inter-process lock and a private `~/.local/state/wechat-download-skill/weread-pacing.json` file (timestamps and counters only, mode `0600`; no credentials). Normal requests are staggered by **5–10 seconds**. Explicit rate limits/HTTP 429 trigger exponential **60-second to 30-minute** cooldowns. A `-2041` human-verification challenge has a separate **30-minute to 24-hour** circuit: later processes fail without contacting WeRead until the cooldown expires, when a single low-frequency probe is allowed. Another challenge doubles the cooldown; success clears it. This is not a way around required official-client verification. Remaining cooldowns longer than 15 seconds fail fast rather than tying up a scheduled job; `status`/`login` remain available, but an authenticated `status` does not prove the challenge is resolved.
+
+```bash
+python3 scripts/download_weread.py pace-status
+# Only after completing any requested verification in the official client:
+python3 scripts/download_weread.py pace-reset --verified
+```
+
+Never run `pace-reset` automatically in a scheduler. Treat an active circuit as a failed check and wait for a later run. An exact public RSS fallback may still work for a known URL when the WeRead path is unavailable, but catalogue coverage is limited.
+
 ## Bounded retries, normal articles, image posts, and exact-item RSS
 
-- A missing/insufficient body, timeout, or transient service error gets **up to three retries after the initial request**, with **2/4/8-second backoff** and a forced CLI cache refresh. Explicit verification, rate limits, `-2041`, and blocked pages are **not** hammered. The previous `HEAD` redirect guard was removed: even an article that succeeds with a fresh WeRead CLI request returned a challenge to independent `HEAD`, so HEAD alone is not proof that a GET body is unavailable.
+- A missing/insufficient body, timeout, or transient service error gets **up to three retries after the initial request**, with **10/30/90-second backoff** and a forced CLI cache refresh. Explicit verification, rate limits, `-2041`, and blocked pages are **not** hammered. The previous `HEAD` redirect guard was removed: even an article that succeeds with a fresh WeRead CLI request returned a challenge to independent `HEAD`, so HEAD alone is not proof that a GET body is unavailable.
 - After the eInk source fails, the adapter makes one bounded, no-redirect request to the public article URL with the pinned eInk user agent. It accepts a substantive visible `#js_content` or long `content_noencode` for normal articles. For `item_show_type=8` image posts, it archives the complete `picture_page_info_list` gallery plus the caption; teasers alone never count as success. An explicitly configured Web session then gets one try before RSS. Finally the adapter uses the verified account name from its response, or an explicit `--rss-account 'Exact account name'`, to look up the public RSS catalogue. It saves a `.md` file only if the feed has the **same article URL identity** (short link or all `__biz`/`mid`/`idx`/`sn` fields) and a nontrivial `content:encoded` body. The Markdown records its third-party RSS provenance. A similar title or a neighboring article is never substituted.
 - Missing catalogue entries, a slow feed, no exact article match, or a short RSS body remain failures with nonzero exit status and `failures.json` for batches. Search/list failures before an article URL is available cannot be matched to an exact RSS item; use the standalone RSS command after confirming the account.
 

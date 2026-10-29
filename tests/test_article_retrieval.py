@@ -24,7 +24,7 @@ class RetrievalTests(unittest.TestCase):
         result = read_article(client, URL, fallback=fallback, sleep=delays.append)
         self.assertEqual(result["markdown"], "正文" * 100)
         self.assertEqual(client.calls, [(URL, None), (URL, True), (URL, True), (URL, True)])
-        self.assertEqual(delays, [2, 4, 8])
+        self.assertEqual(delays, [10, 30, 90])
         fallback.fetch.assert_not_called()
 
     def test_exhaustion_then_rss_uses_verified_account_name(self):

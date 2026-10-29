@@ -3,6 +3,7 @@
 Authentication belongs to weread-omni; this module never handles or logs cookies.
 """
 
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,8 @@ import re
 import shutil
 import subprocess
 from urllib.parse import urlsplit
+
+from weread_pacing import PacingBlocked, WeReadPacer
 
 CLI_VERSION = "0.1.2"
 MIN_UNVERIFIED_BODY_CHARACTERS = 80
@@ -80,11 +83,13 @@ def _find_article_url(obj, depth=0):
 
 
 class WeReadClient:
-    def __init__(self, executable=None, account=None, refresh=False, runner=None):
+    def __init__(self, executable=None, account=None, refresh=False, runner=None, pacer=None):
         self.executable = executable or executable_path()
         self.account = account or os.environ.get("WEREAD_ACCOUNT", "default")
         self.refresh = refresh
         self.runner = runner or subprocess.run
+        # A supplied runner is a test seam; real CLI calls always share the on-disk gate.
+        self.pacer = pacer if pacer is not None else (WeReadPacer() if runner is None else None)
 
     def command(self, *parts, refresh=None):
         base = [self.executable, "--account", self.account, "--json"]
@@ -93,6 +98,14 @@ class WeReadClient:
         return base + [str(part) for part in parts]
 
     def call(self, *parts, timeout=90, refresh=None):
+        guard = self.pacer.request() if self.pacer is not None and parts[0] not in ("doctor", "login") else nullcontext()
+        try:
+            with guard:
+                return self._run(*parts, timeout=timeout, refresh=refresh)
+        except PacingBlocked as exc:
+            raise WeReadError(str(exc), code=exc.code) from exc
+
+    def _run(self, *parts, timeout=90, refresh=None):
         try:
             completed = self.runner(self.command(*parts, refresh=refresh), capture_output=True, text=True, timeout=timeout)
         except subprocess.TimeoutExpired as exc:
