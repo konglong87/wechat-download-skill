@@ -74,6 +74,12 @@ python3 scripts/download_weread.py pace-reset --verified
 
 Never run `pace-reset` automatically in a scheduler. Treat an active circuit as a failed check and wait for a later run. For a known URL blocked locally by the WeRead circuit, the independent public original-page reader may still work; then exact-item public RSS is attempted. A blocked page or missing feed remains a failure.
 
+### Diagnosing `-2041` without assuming a single cause
+
+[Upstream weread-omni](https://github.com/teng-lin/weread-omni/blob/main/src/api/mobile.ts#L104-L112) treats `-2041` as a session-fingerprint human-verification challenge. A [different Android client's bug](https://github.com/x554960766/wechat-mp-tools/issues/22) produced the same code when `synckey` was missing. This pinned CLI already sends `synckey=0` on the first `/mp/chapters` request; `/store/search` also failed, so do not blindly copy that other client's parameter fix or promise that waiting suffices.
+
+A user may personally open a public-account article in the **official WeRead website** and complete any CAPTCHA displayed. [Community reports](https://github.com/finlater/weread.koplugin/issues/62) conflict about whether this restores a separate eInk session. If available, the phone app's Settings → Privacy → reauthorize public accounts is another unverified, user-operated option. Clearing logged-in devices and scanning in again is a **last resort** that logs devices out and is not guaranteed to work. Never share cookies or verification codes with an agent. Only after actual official verification should the user consider `pace-reset --verified` and one diagnostic probe; this command merely clears the local circuit. Otherwise use known public article URLs individually and report that automatic newest-article discovery remains blocked.
+
 ## Bounded retries, normal articles, image posts, and exact-item RSS
 
 - A missing/insufficient body, timeout, or transient service error gets **up to three retries after the initial request**, with **10/30/90-second backoff** and a forced CLI cache refresh. Explicit verification, rate limits, `-2041`, and blocked pages are **not** hammered. The previous `HEAD` redirect guard was removed: even an article that succeeds with a fresh WeRead CLI request returned a challenge to independent `HEAD`, so HEAD alone is not proof that a GET body is unavailable.
