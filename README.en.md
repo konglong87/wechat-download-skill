@@ -2,7 +2,7 @@
 
 **Recommended route: archive known public WeChat article URLs directly, without WeRead authentication or eInk search.** Save verified visible article bodies as Markdown, and image posts with their local original images. A URL list supports one-by-one batch archiving; challenge pages, mismatched accounts, and teaser-only pages fail closed. Older WeRead, owner-dashboard, and public RSS paths remain optional, **not the default**.
 
-> **Live check, 2026-10-29:** An explicitly supplied third-party `匿名测试公众号` article URL produced a **44,395-byte** Markdown file with title, account, date, and body using the standalone public-page CLI. This proves a *known URL* can work, **not** that the three newest posts can be discovered automatically from an account name. Public RSS covers only indexed accounts; title-only/VIP directories are not original-URL sources.
+> **Live check, 2026-10-29:** An explicitly supplied article URL from the owner-managed `孔小黑进城` account produced a **7,539-byte** Markdown file using the standalone public-page CLI. The owner dashboard also supplied three published links that were archived. A successful known URL does **not** prove that the latest posts of any account can be discovered unattended. Public RSS covers only indexed accounts; title-only/VIP directories are not original-URL sources.
 
 ## How other Agents use this Skill (natural language first)
 
@@ -37,8 +37,7 @@ This is not a guarantee that an account name alone will always yield the latest 
 
 ### Live-verified boundaries
 
-- `匿名测试公众号`: a known original URL was archived as a 44,395-byte Markdown file; normal and image-post archives also exist locally.
-- `孔小黑进城`: a known original URL was archived as a 7,539-byte normal article; three posts were previously obtained through the owner's dashboard, but third-party latest-post discovery is not yet stable.
+- `孔小黑进城`: a known original URL was archived as a 7,539-byte normal article; three published links from its owner dashboard yielded one normal article and two image posts with three local originals. Discovery of arbitrary third-party accounts' latest posts is not yet stable.
 - Android automatic link extraction and phone-to-computer synchronization have not been validated on the current device; do not promise unattended operation.
 - Image text is not OCRed automatically; add OCR separately and review it.
 
@@ -64,9 +63,9 @@ The installer pins `weread-omni@0.1.2` under `~/.local/share/wechat-download-ski
 ### Download a known article URL
 
 ```bash
-python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE' ./wechat_downloads
+python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/TG5KkixnncIrunVZF2ROKQ' ./wechat_downloads
 # Bypass the CLI cache and refetch:
-python3 scripts/download_weread.py --refresh url 'https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE' ./wechat_downloads
+python3 scripts/download_weread.py --refresh url 'https://mp.weixin.qq.com/s/TG5KkixnncIrunVZF2ROKQ' ./wechat_downloads
 ```
 
 Replace the example with your own `https://mp.weixin.qq.com/s/...` article URL. On success, check the printed `.md` path and size, then inspect the body. The example was verified on a specific date; future availability is not guaranteed.
@@ -80,7 +79,7 @@ On October 29, 2026, the managed 孔小黑进城 dashboard listed [Oct 15](https
 ### Start with an account name
 
 ```bash
-python3 scripts/download_weread.py search '匿名测试公众号'
+python3 scripts/download_weread.py search '孔小黑进城'
 # Replace this illustrative ID with bookInfo.bookId from the search result:
 python3 scripts/download_weread.py list MP_WXS_1234567890 0 5
 python3 scripts/download_weread.py download MP_WXS_1234567890 5 ./wechat_downloads
@@ -135,7 +134,7 @@ A user may personally open a public-account article in the **official WeRead web
 python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/ARTICLE' ./wechat_downloads --rss-account 'Exact account name'
 ```
 
-The investigation found two distinct formats. The upstream CLI falsely rejected the normal Ontology article because its body discusses “需要验证”; structured body extraction saved it. Posts 1 and 3 had only 326/447-character text previews because they are **image posts (`item_show_type=8`)**, not regular text articles. The gallery adapter archived their 7 and 8 original CDN images. All 15 files decoded successfully, dimensions matched the page declarations, and representative original images were visually inspected. This **3/3** result archives the actual media, not OCR text from inside those images. Neither an unauthenticated Web session nor the missing public RSS catalogue was needed.
+On October 29, 2026, the owner-managed `孔小黑进城` dashboard supplied three published article URLs. One was archived as a normal text article; two were **image posts (`item_show_type=8`)** with 1 and 2 local originals respectively. The **3/3** owner-side result archives actual media, not OCR text from the images, and does not establish unattended discovery for third-party accounts.
 
 
 ## Optional authenticated WeRead Web body (experimental)
@@ -147,7 +146,7 @@ The [we-mp-rss community implementation](https://github.com/rachelos/we-mp-rss/b
 3. Re-run the download below. The Cookie is sent only to the fixed WeRead Web content endpoint with no redirects; login/challenge shells and short bodies are rejected. If it fails, the exact-item RSS fallback still runs and the process exits nonzero if no body was saved.
 
 ```bash
-python3 scripts/download_weread.py --refresh download MP_WXS_1234567890 3 ./wechat_downloads/匿名测试公众号 --rss-account '匿名测试公众号'
+python3 scripts/download_weread.py --refresh download MP_WXS_3227210349 3 ./wechat_downloads/孔小黑进城 --rss-account '孔小黑进城'
 # Optional private-file override: --web-cookie-file /private/path/weread-web.cookie before "download"
 ```
 
@@ -157,7 +156,7 @@ Re-sign in and re-run `web-cookie` if the session expires; to disable the route,
 
 An agent may periodically run `status`, `list ID 0 10`, then `download ID 10 ./wechat_downloads/account` in a **persistent** output directory, reporting newly saved Markdown files, skipped files, failures, and the process exit code. On a nonzero exit, do not report a successful check or “no new articles.” Choose a count large enough to cover new posts since the last run. Scheduling belongs to the user's Codex/Claude/other agent; this project does not install background jobs and saves a separate Web session secret only if the user explicitly invokes `web-cookie`.
 
-**October 28, 2026: all three newest 匿名测试公众号 post packages archived (one text body, two complete image galleries with 15 local files). A repeat batch run reported `Skipped: 3, Failed: 0` and cleared the old `failures.json`.** Scheduled agents must still check exit status and every local image reference; future inaccessible/new-format posts may fail. Text-only agents need optional OCR and human review to search words inside pictures.
+**October 29, 2026: three published `孔小黑进城` posts from the owner dashboard were archived individually (one text article, two image posts with three local originals). This required owner-dashboard links and does not establish unattended discovery for other accounts.** Scheduled agents must still check exit status and every local image reference; future inaccessible/new-format posts may fail. Text-only agents need optional OCR and human review to search words inside pictures.
 
 ## Login-free RSS fallback
 

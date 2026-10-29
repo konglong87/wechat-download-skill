@@ -2,7 +2,7 @@
 
 **当前推荐：公开原文链接直下，不依赖微信读书登录或 eInk 列表。** 输入自己合法取得的 `https://mp.weixin.qq.com/s/...` 链接，保存普通文章 Markdown；图片分享保存摘要、Markdown 和全部可验证本地原图。支持一篇或逐行链接批量归档；验证页、账号不符、仅有摘要时明确失败，绝不伪造正文。已有微信读书／后台／RSS 路线保留为历史可选功能，**不再作为默认方案**。
 
-> **2026-10-29 真实验收**：对第三方公众号「匿名测试公众号」的已知文章《示例文章标题》，使用独立公开页入口成功保存 **44,395 字节**的 Markdown（含来源、公众号及时间）；无微信读书调用。但它只是给定链接的单篇成功，**没有实现“只填账号名→自动发现最新三篇”**。公开 RSS 仅覆盖收录账号；第三方标题目录可能只提供标题或需要 VIP，不应把它当成原文链接或下载成功。
+> **2026-10-29 真实验收**：对本人管理的公众号「孔小黑进城」的已知文章《Agent正式进入下半场：做减法》，使用独立公开页入口成功保存 **7,539 字节**的 Markdown（含来源、公众号及时间）；无微信读书调用。后台曾取得并归档该号 3 篇，但单篇直链成功**不等于**“只填账号名→自动发现最新三篇”。公开 RSS 仅覆盖收录账号；标题目录可能只提供标题或需要 VIP，不能把它当作原文链接或下载成功。
 
 [English README](README.en.md)
 
@@ -53,8 +53,7 @@ Agent 会依次尝试能够合法获得原文链接的渠道：
 
 ### 真实验收和能力边界
 
-- 「匿名测试公众号」：已验证 Agent 拿到已知原文链接后可保存 44,395 字节 Markdown；本地已有普通正文和图片分享归档。
-- 「孔小黑进城」：已验证已知原文链接可保存 7,539 字节普通正文；后台曾取得并归档 3 篇，但第三方账号的最新文章自动发现尚未稳定验证。
+- 「孔小黑进城」：已验证给定原文链接可保存 7,539 字节普通正文；本人后台曾取得并归档该号 3 篇（1 篇普通正文、2 篇图片分享，共 3 张本地原图）。**任意第三方账号**的最新文章自动发现尚未稳定验证。
 - Android 自动提链和手机到电脑同步：尚未在当前设备上完成实机验收，不应对用户承诺无人值守。
 - 图片文章中的文字：只下载原图，不自动 OCR；需要文字检索时另接 OCR 并人工复核。
 
@@ -81,9 +80,9 @@ python3 scripts/download_weread.py pace-status  # 检查冷却与验证熔断，
 ### 已知文章链接：直接下载
 
 ```bash
-python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE' ./wechat_downloads
+python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/TG5KkixnncIrunVZF2ROKQ' ./wechat_downloads
 # 需要跳过 CLI 缓存、重新从上游抓取时：
-python3 scripts/download_weread.py --refresh url 'https://mp.weixin.qq.com/s/EXAMPLE_ARTICLE' ./wechat_downloads
+python3 scripts/download_weread.py --refresh url 'https://mp.weixin.qq.com/s/TG5KkixnncIrunVZF2ROKQ' ./wechat_downloads
 ```
 
 将示例链接替换为自己的 `https://mp.weixin.qq.com/s/...` 文章链接。成功时打印 `.md` 路径与字节数；请打开文件检查实际正文。上面的成功案例是特定日期的实测，**不是该链接今后总能访问的保证**。
@@ -97,7 +96,7 @@ python3 scripts/download_weread.py --refresh url 'https://mp.weixin.qq.com/s/EXA
 ### 只有公众号名称：先查索引，再小批量下载
 
 ```bash
-python3 scripts/download_weread.py search '匿名测试公众号'
+python3 scripts/download_weread.py search '孔小黑进城'
 # 从搜索结果的 bookInfo.bookId 取得真实 MP_WXS_<数字>，替换下方示意 ID：
 python3 scripts/download_weread.py list MP_WXS_1234567890 0 5
 python3 scripts/download_weread.py download MP_WXS_1234567890 5 ./wechat_downloads
@@ -107,7 +106,7 @@ python3 scripts/download_weread.py download MP_WXS_1234567890 5 ./wechat_downloa
 
 ## 输出与失败处理
 
-- 每篇成功文章保存一个带原文链接、公众号名和发布时间的 `.md` 文件；已保存的文章跳过。普通文章的内嵌图片目前可能仍是远程链接；**图片分享**则将页面声明的所有原图下载到同名 `_images/` 目录，并在 Markdown 中用相对路径引用。所有图片必须落盘并通过类型与大小校验；本轮又用系统图片解码器复核全部 15 张。
+- 每篇成功文章保存一个带原文链接、公众号名和发布时间的 `.md` 文件；已保存的文章跳过。普通文章的内嵌图片目前可能仍是远程链接；**图片分享**则将页面声明的所有原图下载到同名 `_images/` 目录，并在 Markdown 中用相对路径引用。所有图片必须落盘并通过类型与大小校验；本号已归档的两篇图片分享共有 3 张本地原图，仍需逐张验收。
 - 普通文章正文缺失，或图片分享缺少任何一张原图且其他路线也无可用内容时返回错误，不生成伪正文／伪图片包；批量下载记录失败项到 `failures.json` 并返回非零退出码。核对成功数、失败数和实际文件，不要把“搜索成功”当成“全文下载成功”。
 - 微信读书接口可能临时返回 `-2041`；本次测试中稍后重试搜索和列表恢复，手机 App **没有**出现单独的验证入口。遇到风控请停止高频请求，之后再试，勿绕过平台验证。现在 CLI 已持久化熔断：`-2041` 后至少 30 分钟不再向微信读书请求，到期才允许单次探测；再次失败会加倍冷却。
 - 上游可能标记 `completeness=unverified`。即使正文看起来完整，也无法保证与微信原文逐字一致；已删、受限、付费文章及部分公开文章可能无法读取。只归档自己有权访问和使用的内容。
@@ -159,19 +158,19 @@ python3 scripts/download_weread.py pace-reset --verified
 python3 scripts/download_weread.py url 'https://mp.weixin.qq.com/s/ARTICLE' ./wechat_downloads --rss-account '公众号准确名称'
 ```
 
-2026-10-28 的定位过程：普通文章的上游 CLI 曾把第二篇正文里的“需要验证”误判为拦截；修复结构化正文提取后第二篇落盘。第一、三篇在普通正文接口只提供 326／447 字摘要，进一步发现其 `item_show_type=8`，**正文载体实际是图片画廊**。现已按页面清单下载第 1 篇 7 张（约 10.0 MB）、第 3 篇 8 张（约 3.9 MB）图片，全部 15 张可解码，尺寸与页面声明一致，抽查原图确认内容与主题相关。保存的是原图和原文摘要，**并非图片内文字的可搜索纯文本**。本轮不依赖未登录的微信读书 Web 接口或未收录该号的 RSS。
+2026-10-29 对本人管理的「孔小黑进城」逐篇验收：后台给出的三条已发表原文链接分别保存为一篇普通正文和两篇 `item_show_type=8` 图片分享。图片分享按页面清单归档 1 张和 2 张原图及摘要，共 3 张本地图片。保存的图片**并非图片内文字的可搜索纯文本**；这次本人后台发现不构成对任意第三方公众号的自动发现能力。
 
 
 ## 可选：微信读书网页授权正文通道（实验性）
 
-[社区项目 we-mp-rss 的实现](https://github.com/rachelos/we-mp-rss/blob/main/core/wx/model/weread_mp.py)提示另一个微信读书 Web 正文接口 `/web/mp/content?reviewId=...`。这与 `weread-omni` 的 eInk 扫码登录**不是同一登录态**。实测无网页登录时返回 `errCode=-2010`（用户不存在）；目前尚未在本项目验证“匿名测试公众号”最新三篇能否由**真实已授权 Web 会话**读取，不能将这项改动称为已下载成功。此接口非正式公开 API，可能随时变化。
+[社区项目 we-mp-rss 的实现](https://github.com/rachelos/we-mp-rss/blob/main/core/wx/model/weread_mp.py)提示另一个微信读书 Web 正文接口 `/web/mp/content?reviewId=...`。这与 `weread-omni` 的 eInk 扫码登录**不是同一登录态**。实测无网页登录时返回 `errCode=-2010`（用户不存在）；目前尚未在本项目验证“孔小黑进城”最新三篇能否由**真实已授权 Web 会话**读取，不能将这项改动称为已下载成功。此接口非正式公开 API，可能随时变化。
 
 1. 在自己的浏览器访问 `https://weread.qq.com`，自行完成网页登录，确认本人可在网页中正常阅读目标文章。不要把 Cookie、二维码或验证码发给 Agent／聊天窗口。
 2. 如愿意启用此实验通道，在浏览器开发者工具 **Network** 中选择 `weread.qq.com` 的同源请求，复制 **Request Headers → Cookie 的值**（不要复制其他站点的 Cookie）；于本机交互式终端执行 `python3 scripts/download_weread.py web-cookie`，在隐藏输入提示粘贴并回车。文件存于 `~/.local/share/wechat-download-skill/weread-web.cookie`，权限 `0600`，项目 `.gitignore` 忽略 `*.cookie`。请将它视作登录密钥，不要分享到 Issue 或提交到 Git。
 3. 再运行下列命令。程序只向固定 `https://weread.qq.com/web/mp/content` 发送该 Cookie，不跟随重定向；仅在识别到非空正文时写 Markdown。无登录、响应是验证页、正文太短时会继续按原文精确匹配 RSS，最终失败仍返回非零状态。
 
 ```bash
-python3 scripts/download_weread.py --refresh download MP_WXS_1234567890 3 ./wechat_downloads/匿名测试公众号 --rss-account '匿名测试公众号'
+python3 scripts/download_weread.py --refresh download MP_WXS_3227210349 3 ./wechat_downloads/孔小黑进城 --rss-account '孔小黑进城'
 # 如需另选私有文件：把 --web-cookie-file /安全目录/weread-web.cookie 放在 download 子命令前
 ```
 
@@ -181,7 +180,7 @@ python3 scripts/download_weread.py --refresh download MP_WXS_1234567890 3 ./wech
 
 旧微信读书流程曾在已有登录态和**持久化输出目录**下运行 `status`、`list ID 0 10`，再调用 `download ID 10 ./wechat_downloads/目标号`，报告实际新增 `.md`、跳过和失败数；若命令非零退出，不能把本次巡检标记为成功或“没有新文章”。检查数量要覆盖两次运行间可能新增的文章。Codex、Claude 等 Agent 的定时机制由用户自行配置，本项目不安装后台任务；只有用户显式执行 `web-cookie` 时才在个人目录保存独立的网页会话密钥。
 
-**2026-10-28 对「匿名测试公众号」最新三篇的逐篇及批量验收：1 篇普通正文＋2 篇完整图片画廊，合计 `3/3` 篇归档、15 张本地图片；再次批量运行 `Skipped: 3, Failed: 0`，已清除旧 `failures.json`。** 定时任务仍需检查退出码、实际文件及图片引用；后续遇到无法访问、缺图或新格式仍应报失败，不可默认任意公众号每篇均成功。文本搜索／纯文本 Agent 若需识别图片内文字，应另行 OCR 并人工核对。
+**2026-10-29 对本人管理的「孔小黑进城」后台显示的三篇已发表文章逐篇归档：1 篇普通正文＋2 篇图片分享，合计 `3/3` 篇、3 张本地原图；这依赖本人后台提供链接，不代表任意第三方账号可以无人值守发现最新三篇。** 定时任务仍需检查退出码、实际文件及图片引用；后续遇到无法访问、缺图或新格式仍应报失败，不可默认任意公众号每篇均成功。文本搜索／纯文本 Agent 若需识别图片内文字，应另行 OCR 并人工核对。
 
 ## 免登录备用：公开 RSS
 
