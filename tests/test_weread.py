@@ -1,4 +1,5 @@
 import json
+import hashlib
 from pathlib import Path
 import sys
 import tempfile
@@ -6,7 +7,7 @@ import unittest
 from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from download_weread import collect_articles, download_account, download_url
+from download_weread import _save_article, collect_articles, download_account, download_url
 from download_rss import RSSError
 from weread_client import WeReadClient, WeReadError, article_url
 
@@ -36,6 +37,39 @@ class FakeClient:
 
 
 class WeReadTests(unittest.TestCase):
+    def test_direct_url_deduplicates_changed_review_id_and_keeps_gallery_links(self):
+        class GalleryClient:
+            def __init__(self): self.calls = 0
+            def read(self, url):
+                self.calls += 1
+                review_id = "upstream-" + str(self.calls)
+                source_digest = hashlib.sha256(review_id.encode()).hexdigest()[:12]
+                return {"reviewId": review_id, "title": "图片文章", "markdown":
+                        "## 原文图片（1 张，已下载到本地）\n\n![原图](" + source_digest + "_images/01.png)",
+                        "assets": [{"filename": "01.png", "data": b"\x89PNG\r\n\x1a\n" + b"0" * 600}],
+                        "contentSource": "微信公众号图片分享"}
+        client = GalleryClient()
+        url_digest = hashlib.sha256(ARTICLE_URL.encode()).hexdigest()[:12]
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(download_url(client, ARTICLE_URL, directory), 0)
+            self.assertEqual(download_url(client, ARTICLE_URL, directory), 0)
+            files = list(Path(directory).glob("*.md"))
+            self.assertEqual(len(files), 1)
+            self.assertTrue(files[0].name.startswith(url_digest + "_"))
+            self.assertIn(url_digest + "_images/01.png", files[0].read_text())
+            self.assertTrue((Path(directory) / (url_digest + "_images/01.png")).is_file())
+
+    def test_legacy_review_id_archive_is_reused_by_exact_url(self):
+        class ChangedReviewClient(FakeClient):
+            def read(self, url):
+                return {**super().read(url), "reviewId": "different-review-id"}
+        with tempfile.TemporaryDirectory() as directory:
+            old = {"reviewId": "old-review-id", "title": "示例标题", "markdown": "正文内容" * 60}
+            path, saved = _save_article(Path(directory), "old-review-id", "示例标题", ARTICLE_URL, {}, old)
+            self.assertTrue(saved)
+            self.assertEqual(download_url(ChangedReviewClient(), ARTICLE_URL, directory), 0)
+            self.assertEqual(list(Path(directory).glob("*.md")), [path])
+
     def test_article_url_allowlist(self):
         self.assertEqual(article_url(ARTICLE_URL), ARTICLE_URL)
         for value in ("http://mp.weixin.qq.com/s/x", "https://evil.example/s/x", "file:///etc/passwd", "https://mp.weixin.qq.com:bad/s/x"):
@@ -170,7 +204,7 @@ class WeReadTests(unittest.TestCase):
                     raise WeReadError("freq control")
                 return super().articles(account_id, count, offset)
         entries = [
-            {"reviewId": "r{}".format(i), "title": "item {}".format(i), "mpInfo": {"doc_url": ARTICLE_URL}}
+            {"reviewId": "r{}".format(i), "title": "item {}".format(i), "mpInfo": {"doc_url": ARTICLE_URL + str(i)}}
             for i in range(20)
         ]
         client = FailingSecondPage({None: {"articles": entries, "nextOffset": 20}})

@@ -1,6 +1,6 @@
 # wechat-download-skill
 
-An agent skill and CLI for discovering WeChat official accounts through a **QR-authenticated WeRead account** and saving normal article text as Markdown or image-post galleries as Markdown plus local original images. Known article URLs can be downloaded directly. An optional separately authenticated WeRead Web body route can be tried when the public source is blocked; public RSS is a login-free fallback. The legacy WeChat MP admin route is retained only for compatibility.
+An agent skill and CLI for discovering WeChat official accounts through a **QR-authenticated WeRead account** and saving normal article text as Markdown or image-post galleries as Markdown plus local original images. Known article URLs can be downloaded directly. Owners of an official account can also discover their own recent published URLs in the official MP dashboard and download them individually. An optional WeRead Web body route and public RSS are independent fallbacks; the legacy MP admin API remains compatibility-only.
 
 > **Latest-three real download (October 28, 2026):** All three newest 匿名测试公众号 posts were archived: the Ontology post is a normal **42,669-byte Markdown / 17,671-character body**; posts 1 and 3 are WeChat `item_show_type=8` image posts, archived with their captions and **7 + 8 original images**. Result: **3/3 post packages, 15/15 locally saved images**, with a successful batch recheck. Text inside images has **not** been OCRed; this is not three plain-text full articles.
 
@@ -32,6 +32,12 @@ python3 scripts/download_weread.py --refresh url 'https://mp.weixin.qq.com/s/EXA
 
 Replace the example with your own `https://mp.weixin.qq.com/s/...` article URL. On success, check the printed `.md` path and size, then inspect the body. The example was verified on a specific date; future availability is not guaranteed.
 
+### Your own MP account: find recent published URLs in the dashboard
+
+This requires **management access to that account**; it does not discover posts from arbitrary third-party accounts. In the in-app browser, open `https://mp.weixin.qq.com/`, select “WeChat quick login,” review and confirm the permission prompt yourself, and select the managed account. Read the titles, dates, and original URLs under “Recent publications” or Content → Publication records. Download each URL using `python3 scripts/download_weread.py url 'ARTICLE_URL' ./wechat_downloads/ACCOUNT --rss-account 'ACCOUNT'`. Do not provide browser cookies, dashboard tokens, or access to drafts/publishing. This MP login is **not** WeRead eInk verification and does not resolve `-2041`.
+
+On October 29, 2026, the managed 孔小黑进城 dashboard listed [Oct 15](https://mp.weixin.qq.com/s/QSBBXzcE8otJdVYIeqUCIg), [Sep 7](https://mp.weixin.qq.com/s/k-CZ7JH-HLiVI7s2pJzL7w), and [Sep 6](https://mp.weixin.qq.com/s/TG5KkixnncIrunVZF2ROKQ). All **3/3** were saved individually: the first two are image posts with **1 + 2 original images and captions**, and the third is a normal text article. The public-page reader now fills image-post title/publication metadata; URL-based deduplication avoids duplicates when an upstream `reviewId` changes. This is **interactive owner-side discovery, not an unattended MP dashboard API**.
+
 ### Start with an account name
 
 ```bash
@@ -60,7 +66,7 @@ python3 scripts/download_weread.py identify 'https://mp.weixin.qq.com/s/TG5Kkixn
 python3 scripts/download_weread.py list MP_WXS_3227210349 0 3
 ```
 
-The ID identifies this **known article's publisher**; it does not prove that the recent-article list is accessible or that indexed search results are current. Redirects, verification shells, publisher mismatches and ambiguous IDs fail closed. A list-level `-2041` remains a stop signal; neither this command nor the public-page body fallback bypasses a CAPTCHA. **Observed October 29, 2026:** the known 孔小黑进城 article archived from its public page (7,523-byte Markdown), but the one `/mp/chapters` attempt after cooldown also returned `-2041`; no newest-three list or 3/3 download is claimed. The unauthenticated public profile showed a verification page, and this account was absent from the public RSS catalogue. Upstream distinguishes `-2041` (human verification) from `-2014` (throttling); pacing and re-login do not guarantee recovery. Without a usable official-client verification flow or an independent current index, ask the user for the newest article URLs and archive them individually.
+The ID identifies this **known article's publisher**; it does not prove that the WeRead recent-article list is accessible or current. Redirects, verification shells, publisher mismatches and ambiguous IDs fail closed. A list-level `-2041` remains a stop signal. **Observed October 29, 2026:** the known 孔小黑进城 article archived from its public page (7,523-byte Markdown), but one `/mp/chapters` attempt after cooldown still returned `-2041`. The unauthenticated public profile showed a verification page and the public RSS catalogue lacked the account. **Those routes** did not reveal the newest three; the later authenticated **owner's MP dashboard** did, and each resulting URL was archived as described above. This does not restore WeRead eInk discovery or enable unattended discovery for arbitrary third-party accounts.
 
 ## Adaptive pacing and verification circuit
 
@@ -78,7 +84,7 @@ Never run `pace-reset` automatically in a scheduler. Treat an active circuit as 
 
 [Upstream weread-omni](https://github.com/teng-lin/weread-omni/blob/main/src/api/mobile.ts#L104-L112) treats `-2041` as a session-fingerprint human-verification challenge. A [different Android client's bug](https://github.com/x554960766/wechat-mp-tools/issues/22) produced the same code when `synckey` was missing. This pinned CLI already sends `synckey=0` on the first `/mp/chapters` request; `/store/search` also failed, so do not blindly copy that other client's parameter fix or promise that waiting suffices.
 
-A user may personally open a public-account article in the **official WeRead website** and complete any CAPTCHA displayed. [Community reports](https://github.com/finlater/weread.koplugin/issues/62) conflict about whether this restores a separate eInk session. If available, the phone app's Settings → Privacy → reauthorize public accounts is another unverified, user-operated option. Clearing logged-in devices and scanning in again is a **last resort** that logs devices out and is not guaranteed to work. Never share cookies or verification codes with an agent. Only after actual official verification should the user consider `pace-reset --verified` and one diagnostic probe; this command merely clears the local circuit. Otherwise use known public article URLs individually and report that automatic newest-article discovery remains blocked.
+A user may personally open a public-account article in the **official WeRead website** and complete any CAPTCHA displayed. [Community reports](https://github.com/finlater/weread.koplugin/issues/62) conflict about whether this restores a separate eInk session. In this test, the phone app's Settings → Privacy had **no** “reauthorize public accounts” option; do not keep directing users there. Clearing logged-in devices and scanning in again is a **last resort** that logs devices out and is not guaranteed to work. Never share cookies or verification codes with an agent. Only after actual official WeRead verification should the user consider `pace-reset --verified` and one diagnostic probe. Otherwise use known public article URLs individually; for an account the user manages, its own MP dashboard can supply the newest URLs while WeRead discovery remains blocked.
 
 ## Bounded retries, normal articles, image posts, and exact-item RSS
 

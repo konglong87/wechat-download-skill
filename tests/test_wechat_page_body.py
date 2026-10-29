@@ -1,10 +1,10 @@
 from pathlib import Path
 import sys
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from wechat_page_body import WeChatPageBody, NoRedirect, extract_visible_body
+from wechat_page_body import WeChatPageBody, NoRedirect, extract_public_metadata, extract_visible_body
 from weread_client import WeReadError
 
 ARTICLE_URL = "https://mp.weixin.qq.com/s?__biz=abc&mid=123&idx=1&sn=abcdef"
@@ -21,6 +21,29 @@ class FakeResponse:
 
 
 class PublicPageTests(unittest.TestCase):
+    def test_public_metadata_uses_declared_title_and_valid_creation_time(self):
+        page = '<meta content="标题 &amp; 正文" property="og:title"><script>create_time: "2026-10-15 10:20"</script>'
+        self.assertEqual(extract_public_metadata(page), ("标题 & 正文", "2026-10-15 10:20"))
+        self.assertEqual(extract_public_metadata('<meta property="og:title" content="标题"><script>create_time: "2026-99-15 10:20"</script>'),
+                         ("标题", None))
+
+    def test_public_metadata_reaches_image_post_without_index_title(self):
+        page = '<meta property="og:title" content="图片文章"><script>create_time: "2026-10-15 10:20"</script>'
+        opener = Mock()
+        opener.open.return_value = FakeResponse(page.encode("utf-8"))
+        with patch("wechat_page_body.download_picture_post", return_value={"markdown": "图片正文"}) as gallery:
+            WeChatPageBody(opener=opener).read(ARTICLE_URL, account_name="目标号")
+        self.assertEqual(gallery.call_args.kwargs["title"], "图片文章")
+        self.assertEqual(gallery.call_args.kwargs["published_at"], "2026-10-15 10:20")
+
+    def test_public_metadata_rejects_conflicting_expected_title(self):
+        page = '<meta property="og:title" content="另一篇"><div id="js_content">' + '正文。' * 200 + '</div>'
+        opener = Mock()
+        opener.open.return_value = FakeResponse(page.encode("utf-8"))
+        with self.assertRaises(WeReadError) as caught:
+            WeChatPageBody(opener=opener).read(ARTICLE_URL, title="目标标题")
+        self.assertEqual(caught.exception.code, "SOURCE_IDENTITY_MISMATCH")
+
     def test_real_body_is_not_rejected_for_challenge_words_in_article_text(self):
         page = "<html><head><title>{}</title></head><body><div id='js_content'>".format(TITLE)
         page += "<section><p>执行敏感操作时需要验证身份；这是业务需求，不是验证页面。</p></section>" * 30

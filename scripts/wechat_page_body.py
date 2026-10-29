@@ -7,7 +7,9 @@ It never follows verification redirects or treats a metadata preview as text.
 """
 
 import ast
+from datetime import datetime
 from html import unescape
+from html.parser import HTMLParser
 import re
 import urllib.error
 import urllib.parse
@@ -25,6 +27,41 @@ SOURCE_TIMEOUT_SECONDS = 20
 MIN_FULL_BODY_CHARACTERS = 500
 CHALLENGE_PATH = "/mp/wappoc_appmsgcaptcha"
 NOENCODE_PROPERTY = re.compile(r"\bcontent_noencode\s*:\s*([\'\"])")
+PUBLIC_TITLE_PROPERTY = "og:title"
+MAX_PUBLIC_TITLE_CHARACTERS = 300
+PUBLIC_CREATE_TIME = re.compile(r"\bcreate_time:\s*['\"](\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?)['\"]")
+
+
+class PublicArticleMetadata(HTMLParser):
+    """Read only the original page's declared Open Graph title."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.title = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "meta" or self.title:
+            return
+        attributes = dict(attrs)
+        if attributes.get("property") != PUBLIC_TITLE_PROPERTY:
+            return
+        title = (attributes.get("content") or "").strip()
+        if 0 < len(title) <= MAX_PUBLIC_TITLE_CHARACTERS:
+            self.title = title
+
+
+def extract_public_metadata(page):
+    """Metadata accompanies a validated body/gallery; it is never success alone."""
+    parser = PublicArticleMetadata()
+    parser.feed(page)
+    match = PUBLIC_CREATE_TIME.search(page)
+    published_at = match.group(1) if match else None
+    if published_at:
+        try:
+            datetime.fromisoformat(published_at)
+        except ValueError:
+            published_at = None
+    return parser.title, published_at
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -101,6 +138,11 @@ class WeChatPageBody:
         if len(page) > MAX_SOURCE_BYTES:
             raise WeReadError("WeChat original exceeds the body size limit", code="SOURCE_TOO_LARGE")
         html = page.decode("utf-8", "replace")
+        page_title, page_published_at = extract_public_metadata(html)
+        if title and page_title and re.sub(r"\s+", "", title) != re.sub(r"\s+", "", page_title):
+            raise WeReadError("Original page title does not match the requested article", code="SOURCE_IDENTITY_MISMATCH")
+        title = title or page_title
+        published_at = published_at or page_published_at
         try:
             markdown = extract_visible_body(html, title=title, preview=preview)
         except WeReadError as exc:

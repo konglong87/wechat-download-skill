@@ -47,19 +47,34 @@ def _entry_title(entry, fallback):
     return str(entry.get("title") or (mp_info.get("title") if isinstance(mp_info, dict) else None) or fallback)
 
 
+def _archive_complete(output_dir, path, digest, text):
+    if path.stat().st_size <= 100:
+        return False
+    images = re.findall(r"!\[[^]]*\]\((" + re.escape(digest) + r"_images/[0-9]{2}\.(?:jpg|png|gif|webp))\)", text)
+    expected = re.search(r"原文图片（(\d+) 张", text)
+    return not (("微信公众号图片分享" in text or "_images/" in text) and (
+        not images or not expected or len(images) != int(expected.group(1)) or not all(
+            (output_dir / filename).is_file() and (output_dir / filename).stat().st_size >= 500
+            for filename in images)))
+
+
 def _existing_article(output_dir, digest):
     for path in output_dir.glob(digest + "_*.md"):
-        if path.stat().st_size <= 100:
+        text = path.read_text(encoding="utf-8")
+        if _archive_complete(output_dir, path, digest, text):
+            return path
+    return None
+
+
+def _existing_article_for_url(output_dir, url):
+    """Recognize older reviewId-keyed archives without trusting an incomplete gallery."""
+    for path in output_dir.glob("*.md"):
+        digest = path.name.split("_", 1)[0]
+        if not re.fullmatch(r"[0-9a-f]{12}", digest):
             continue
         text = path.read_text(encoding="utf-8")
-        images = re.findall(r"!\[[^]]*\]\((" + re.escape(digest) + r"_images/[0-9]{2}\.(?:jpg|png|gif|webp))\)", text)
-        expected = re.search(r"原文图片（(\d+) 张", text)
-        if ("微信公众号图片分享" in text or "_images/" in text) and (
-                not images or not expected or len(images) != int(expected.group(1)) or not all(
-                (output_dir / filename).is_file() and (output_dir / filename).stat().st_size >= 500
-                for filename in images)):
-            continue
-        return path
+        if ("> 来源：" + url) in text.splitlines()[:8] and _archive_complete(output_dir, path, digest, text):
+            return path
     return None
 
 
@@ -71,6 +86,11 @@ def _save_article(output_dir, key, title, url, entry, result):
     markdown = result.get("markdown")
     if not isinstance(markdown, str) or not markdown.strip():
         raise WeReadError("Article returned without Markdown; cannot save as a readable archive")
+    assets = result.get("assets") or []
+    if assets and result.get("reviewId"):
+        source_digest = hashlib.sha256(result["reviewId"].encode("utf-8")).hexdigest()[:12]
+        if source_digest != digest:
+            markdown = markdown.replace(source_digest + "_images/", digest + "_images/")
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / (digest + "_" + _slug(result.get("title") or title) + ".md")
     metadata = [
@@ -84,7 +104,6 @@ def _save_article(output_dir, key, title, url, entry, result):
         "---",
         "",
     ]
-    assets = result.get("assets") or []
     asset_dir = output_dir / (digest + "_images")
     created = []
     staged = []
@@ -176,6 +195,9 @@ def download_account(client, account_id, count=200, output_dir=DEFAULT_OUTPUT, s
                 url = client.resolve_url(entry)
                 if not url:
                     raise WeReadError("WeRead did not provide a valid original article URL")
+                if _existing_article_for_url(output_dir, url):
+                    skipped += 1
+                    continue
                 result = read_article(client, url, account_name=rss_account, fallback=fallback, sleep=sleep,
                                       web_client=web_client, review_id=key, title=title,
                                       published_at=entry.get("createTime"), source_client=source_client,
@@ -215,7 +237,13 @@ def download_url(client, url, output_dir=DEFAULT_OUTPUT, rss_account=None, rss_f
     output_dir = Path(output_dir)
     result = read_article(client, url, account_name=rss_account, fallback=rss_fallback, sleep=sleep,
                           web_client=web_client, source_client=source_client)
-    path, saved = _save_article(output_dir, result.get("reviewId") or url, result.get("title"), url, {}, result)
+    existing = _existing_article_for_url(output_dir, url)
+    if existing:
+        print("Already exists: {} ({} bytes)".format(existing, existing.stat().st_size))
+        return 0
+    # The URL is stable across WeRead, public-page and RSS routes; an upstream
+    # reviewId can vary between runs and must not create duplicate archives.
+    path, saved = _save_article(output_dir, url, result.get("title"), url, {}, result)
     print("{}: {} ({} bytes)".format("Downloaded" if saved else "Already exists", path, path.stat().st_size))
     return 0
 
